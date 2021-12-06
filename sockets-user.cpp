@@ -21,12 +21,10 @@
 #define GROUP_POST 12
 #define GROUP_RETRIEVE 13
 
-/* Global variables */
-int socketfd;
-
 /* Auxiliary Functions declaration */
 void validateInput(int argc, char * argv[]);
 int parseUserCommand(char * command);
+void userLogin();
 
 /* Main Body */
 int main(int argc, char * argv[]) {
@@ -35,6 +33,11 @@ int main(int argc, char * argv[]) {
     validateInput(argc, argv);
     while (scanf("%s", command) != -1) {
         op = parseUserCommand(command);
+        switch(op) {
+            case LOGIN:
+                userLogin();
+                break;
+        }
     }
     return EXIT_SUCCESS;
 }
@@ -46,15 +49,15 @@ void validateInput(int argc, char * argv[]) {
         fprintf(stderr, "Invalid input. Please try again.\n");
         exit(EXIT_FAILURE);
     }
-    switch(argc) {
+    /* switch(argc) {
         case 1:
             socketfd = socket(AF_UNIX, )
 
-    }
-    /* while ((c = getopt(argc, argv, ":n:p:")) != -1) {
+    } */
+    while ((c = getopt(argc, argv, ":n:p:")) != -1) {
         switch(c) {
             case 'n':
-                if (strcmp(optarg, "-p") == 0) {
+                if (strcmp(optarg, "-p") == 0) { // corner case
                     fprintf(stderr, "Missing argument. Please try again.\n");
                     exit(EXIT_FAILURE);
                 }
@@ -71,10 +74,11 @@ void validateInput(int argc, char * argv[]) {
                 printf("Ayo.\n");
                 break;
         }
-    } */
+    }
 }
 
 int parseUserCommand(char * command) {
+    printf("%s\n", command);
     if (strcmp(command, "reg") == 0) return REGISTER;
     else if (strcmp(command, "unregister") == 0) return UNREGISTER;
     else if (strcmp(command, "login") == 0) return LOGIN;
@@ -92,4 +96,15 @@ int parseUserCommand(char * command) {
         fprintf(stderr, "Invalid user command. Please try again.\n");
         exit(EXIT_FAILURE);
     }
+}
+
+void userLogin() {
+    char buf[15];
+    int i = 0;
+    char user_UID[6], user_pw[9];
+    while (fscanf(stdin, "%s", buf) > 0) {
+        if (strlen(buf) == 1 || buf[0] == '\n') printf("merda?\n");
+        printf("#%d: %s\n", ++i, buf);
+    }
+
 }
