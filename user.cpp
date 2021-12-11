@@ -62,6 +62,7 @@ regex_t regex; int reti;
 /* Auxiliary Functions declaration */
 void exitProtocol();
 void validateInput(int argc, char * argv[]);
+void resetVariables();
 void socketMount();
 int parseUserCommand(char * command);
 void interactUDPServer();
@@ -94,6 +95,7 @@ int main(int argc, char * argv[]) {
                 break;
         }
         interactUDPServer();
+        resetVariables();
     }
 }
 
@@ -102,6 +104,16 @@ void exitProtocol() {
     close(fdDS);
     fprintf(stderr, "System error. Please try again.\n");
     exit(EXIT_FAILURE);
+}
+
+void resetVariables() {
+    memset(buffer, 0, sizeof(buffer));
+    memset(serverMessage, 0, sizeof(serverMessage));
+    memset(commandCode, 0, sizeof(commandCode));
+    memset(userID, 0, sizeof(userID));
+    memset(userPW, 0, sizeof(userPW));
+    memset(tokenList, 0, sizeof(tokenList));
+    numTokens = 0;
 }
 
 /* Auxiliary Functions implementation */
@@ -160,7 +172,7 @@ void socketMount() {
 
 int parseUserCommand(char * command) {
     if (strcmp(command, "reg") == 0) return REGISTER;
-    else if (strcmp(command, "unregister") == 0) return UNREGISTER;
+    else if ((strcmp(command, "unregister") == 0) || (strcmp(command, "unr") == 0)) return UNREGISTER;
     else if (strcmp(command, "login") == 0) return LOGIN;
     else if (strcmp(command, "logout") == 0) return LOGOUT;
     else if (strcmp(command, "exit") == 0) return USER_EXIT;
@@ -235,5 +247,6 @@ void userUnregister() {
     }
     strcpy(userPW, tokenList[1]);
     sprintf(serverMessage, "%s %s %s\n", commandCode, userID, userPW);
+    flag = 1;
     // TODO: Servidor deve dar unsubscribe de todos os grupos do utilizador
 }
