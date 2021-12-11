@@ -1,0 +1,2 @@
+- Verificar comportamento de abortar (devemos continuar ou dar exit em que circunstâncias);
+- Como tratar os casos em que os outros não respeitam (Grupo 10 com mais de 24 caracteres);

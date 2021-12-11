@@ -25,6 +25,11 @@ using namespace std;
 #define MAX_COMMAND_STATUS_SIZE 6
 #define UID_SIZE 5
 #define PASSWORD_SIZE 8
+#define GROUPID_SIZE 2
+#define MAX_GROUPNAME_SIZE 24
+#define MSGID_SIZE 4
+#define MAX_GROUPS 100
+#define MAX_GROUP_STRING_SIZE 3307 // RGL + backspace + N(max is 99) + 100 * (backspace + GID(max is 99) + backspace + GName(max 24) + backspace + MID(max 9999)) 
 
 /* Constants used for switch on commands */
 #define REGISTER 1
@@ -73,14 +78,21 @@ void validateInput(int argc, char * argv[]);
 void resetVariables();
 void socketMount();
 int parseUserCommand(char * command);
+
 void interactUDPServer();
+void interactUDPServerGroups();
+
+void registerServerFeedback();
+void unregisterServerFeedback();
+void loginServerFeedback();
+void logoutServerFeedback();
 
 void userRegister();
-void registerServerFeedback();
 void userUnregister();
-void unregisterServerFeedback();
 void userLogin();
 void userLogout();
+void userExit();
+void showGroups();
 
 /* Main Body */
 int main(int argc, char * argv[]) {
@@ -110,9 +122,18 @@ int main(int argc, char * argv[]) {
                 break;
             case LOGIN:
                 userLogin();
+                loginServerFeedback();
                 break;
             case LOGOUT:
                 userLogout();
+                logoutServerFeedback();
+                break;
+            case USER_EXIT:
+                userExit();
+                break;
+            case GROUPS_LIST:
+                showGroups();
+                break;
         }
         resetVariables();
     }
@@ -184,7 +205,7 @@ void socketMount() {
     // Estabelish TCP connection as well
     n = connect(fdDS, resDS->ai_addr, resDS->ai_addrlen);
     if (n == -1) {
-        fprintf(stderr, "Error conecting to DS. Please try again.\n");
+        fprintf(stderr, "Error conecting to DS via TCP. Please try again.\n");
         exit(EXIT_FAILURE);
     }
 }
@@ -222,8 +243,7 @@ void interactUDPServer() {
             fprintf(stderr, "Error on receiving message from server. Please try again.\n");
             exit(EXIT_FAILURE);
         }
-        write(1, "DS: ", 4); write(1, buffer, n);
-        udpFlag = 0;
+        write(1, "DS: ", 4); write(1, buffer, n); // TO REMOVE AFTERWARDS -> ONLY SERVES FEEDBACK DEBUGGING PURPOSES
     }
 }
 
@@ -250,10 +270,15 @@ void userRegister() {
 }
 
 void registerServerFeedback() {
-    sscanf(buffer, "%s %s", serverResponseCode, serverResponseStatus);
-    if (strcmp(serverResponseCode, "RRG")) exitProtocol();
-    if (strcmp(serverResponseStatus, "OK") && strcmp(serverResponseStatus, "DUP") && strcmp(serverResponseStatus, "NOK")) exitProtocol();
-    if (!strcmp(serverResponseStatus, "OK")) printf("User %s succesfully registered with password %s.\n", userID, userPW);
+    if (udpFlag) {
+        sscanf(buffer, "%s %s", serverResponseCode, serverResponseStatus);
+        if (strcmp(serverResponseCode, "RRG")) exitProtocol();
+        if (strcmp(serverResponseStatus, "OK") && strcmp(serverResponseStatus, "DUP") && strcmp(serverResponseStatus, "NOK")) exitProtocol();
+        if (!strcmp(serverResponseStatus, "OK")) printf("User %s succesfully registered with password %s.\n", userID, userPW);
+        if (!strcmp(serverResponseStatus, "DUP")) printf("User %s is already registered.\n", userID);
+        if (!strcmp(serverResponseStatus, "NOK")) printf("User %s failed to register. Please try again later.\n", userID);
+        udpFlag = 0;
+    }
 }
 
 void userUnregister() {
@@ -280,10 +305,14 @@ void userUnregister() {
 }
 
 void unregisterServerFeedback() {
-    sscanf(buffer, "%s %s", serverResponseCode, serverResponseStatus);
-    if (strcmp(serverResponseCode, "RUN")) exitProtocol();
-    if (strcmp(serverResponseStatus, "OK") && strcmp(serverResponseStatus, "NOK")) exitProtocol();
-    if (!strcmp(serverResponseStatus, "OK")) printf("User %s succesfully unregistered.\n", userID);
+    if (udpFlag) {
+        sscanf(buffer, "%s %s", serverResponseCode, serverResponseStatus);
+        if (strcmp(serverResponseCode, "RUN")) exitProtocol();
+        if (strcmp(serverResponseStatus, "OK") && strcmp(serverResponseStatus, "NOK")) exitProtocol();
+        if (!strcmp(serverResponseStatus, "OK")) printf("User %s succesfully unregistered.\n", userID);
+        if (!strcmp(serverResponseStatus, "NOK")) printf("Unregister request failed. Please check the given UID and pass.\n");
+        udpFlag = 0;
+    }
 }
 
 void userLogin() {
@@ -307,7 +336,22 @@ void userLogin() {
     sprintf(serverMessage, "%s %s %s\n", commandCode, userID, userPW);
     udpFlag = 1;
     interactUDPServer();
-    userSession = USER_LOGGEDIN; strcpy(activeUser, userID); strcpy(activePassword, userPW);
+}
+
+void loginServerFeedback() {
+    if (udpFlag) {
+        sscanf(buffer, "%s %s", serverResponseCode, serverResponseStatus);
+        if (strcmp(serverResponseCode, "RLO")) exitProtocol();
+        if (strcmp(serverResponseStatus, "OK") && strcmp(serverResponseStatus, "NOK")) exitProtocol();
+        if (!strcmp(serverResponseStatus, "OK")) {
+            userSession = USER_LOGGEDIN; 
+            strcpy(activeUser, userID); 
+            strcpy(activePassword, userPW);
+            printf("User %s succesfully logged in.\n", activeUser);
+        }
+        if (!strcmp(serverResponseStatus, "NOK")) printf("Please check login credentials and try again.\n");
+        udpFlag = 0;
+    }
 }
 
 void userLogout() {
@@ -315,5 +359,64 @@ void userLogout() {
     sprintf(serverMessage, "%s %s %s\n", commandCode, activeUser, activePassword);
     udpFlag = 1;
     interactUDPServer();
-    userSession = USER_LOGGEDOUT; memset(activeUser, 0, sizeof(activeUser)); memset(activePassword, 0, sizeof(activePassword));
+    userSession = USER_LOGGEDOUT;
+    memset(activePassword, 0, sizeof(activePassword));
+}
+
+void logoutServerFeedback() {
+    if (udpFlag) {
+        sscanf(buffer, "%s %s", serverResponseCode, serverResponseStatus);
+        if (strcmp(serverResponseCode, "ROU")) exitProtocol();
+        if (strcmp(serverResponseStatus, "OK") && strcmp(serverResponseStatus, "NOK")) exitProtocol();
+        if (!strcmp(serverResponseStatus, "OK")) printf("User %s succesfully logged out.\n", activeUser);
+        if (!strcmp(serverResponseStatus, "NOK")) printf("User %s logout failed. Please try again.\n", activeUser);
+        // To be able to know who logged out only reset af
+        memset(activeUser, 0, sizeof(activeUser));
+        udpFlag = 0;
+    }
+}
+
+void userExit() {
+    freeaddrinfo(resDS);
+    close(fdDS);
+    // TODO: Check TCP
+    exit(EXIT_SUCCESS);
+}
+
+void interactUDPServerGroups() {
+    char groupBufferTemp[MAX_GROUP_STRING_SIZE];
+    char * groupBuffer, * token;
+    int numGroups;
+    char * groupsList[3*MAX_GROUPS];
+    int aux = 0;
+    n = sendto(fdDS, serverMessage, strlen(serverMessage), 0, resDS->ai_addr, resDS->ai_addrlen);
+    if (n == -1) {
+        fprintf(stderr, "Error on sending message ""%s"" to server. Please try again.\n", serverMessage);
+        exit(EXIT_FAILURE);
+    }
+    n = recvfrom(fdDS, groupBufferTemp, sizeof(groupBufferTemp), 0, (struct sockaddr *) &addrDS, &addrlen);
+    if (n == -1) {
+        fprintf(stderr, "sError on sending message ""%s"" to server. Please try again.\n", serverMessage);
+        exit(EXIT_FAILURE);
+    }
+    sscanf(groupBufferTemp, "%s %d ", serverResponseCode, &numGroups);
+    if (strcmp(serverResponseCode, "RGL")) exitProtocol();
+    if (numGroups == 0) { printf("There are no groups.\n"); return; }
+    groupBuffer = (numGroups >= 10) ? groupBufferTemp + 7 : groupBufferTemp + 6;
+    token = strtok(groupBuffer, " ");
+    while (token != NULL && aux < 3 * MAX_GROUPS) {
+        groupsList[aux++] = token;
+        token = strtok(NULL, " ");
+    }
+    printf("There are %d groups: (GID | GName | MID)\n", numGroups);
+    for (int i = 0; i < aux; i += 3) {
+        printf("%s %s %s\n", groupsList[i], groupsList[i+1], groupsList[i+2]);
+    } 
+}
+
+void showGroups() {
+    sprintf(commandCode, "GLS");
+    sprintf(serverMessage, "%s\n", commandCode);
+    udpFlag = 1;
+    interactUDPServerGroups();
 }
