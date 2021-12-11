@@ -408,10 +408,11 @@ void interactUDPServerGroups() {
         groupsList[aux++] = token;
         token = strtok(NULL, " ");
     }
-    printf("There are %d groups: (GID | GName | MID)\n", numGroups);
+    printf("There are %d groups: (GID | GName | Last MID)\n", numGroups);
     for (int i = 0; i < aux; i += 3) {
         printf("%s %s %s\n", groupsList[i], groupsList[i+1], groupsList[i+2]);
-    } 
+    }
+    udpFlag = 0;
 }
 
 void showGroups() {
