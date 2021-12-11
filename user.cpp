@@ -6,13 +6,15 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
-#include <vector>
+#include <map>
 #include <string>
 
 using namespace std;
 
 #define DSIP_DEFAULT "127.0.0.1"
 #define DSPORT_DEFAULT "58011" // change afterwards to group 18
+#define USER_LOGGEDOUT 0
+#define USER_LOGGEDIN 1
 
 #define MAX_COMMAND_SIZE 12
 #define MAX_IP_SIZE 64 // Including large domain names
@@ -20,6 +22,7 @@ using namespace std;
 #define MAX_BUFFER_SIZE 128
 #define MAX_NUM_TOKENS 4
 #define MAX_COMMAND_CODE_SIZE 4
+#define MAX_COMMAND_STATUS_SIZE 6
 #define UID_SIZE 5
 #define PASSWORD_SIZE 8
 
@@ -46,16 +49,21 @@ struct sockaddr_in addrDS;
 
 char ipDS[MAX_IP_SIZE] = DSIP_DEFAULT;
 char portDS[MAX_PORT_SIZE] = DSPORT_DEFAULT;
+int userSession = USER_LOGGEDOUT;
+char activeUser[UID_SIZE];
+char activePassword[PASSWORD_SIZE];
 
 char * tokenList[MAX_NUM_TOKENS];
 int numTokens = 0;
-int flag = 0;
+int udpFlag = 0;
 char buffer[MAX_BUFFER_SIZE];
 char serverMessage[MAX_BUFFER_SIZE];
 char commandCode[MAX_COMMAND_CODE_SIZE];
+char serverResponseCode[MAX_COMMAND_CODE_SIZE];
+char serverResponseStatus[MAX_COMMAND_STATUS_SIZE];
+
 char userID[UID_SIZE];
 char userPW[PASSWORD_SIZE];
-
 
 regex_t regex; int reti;
 
@@ -66,8 +74,13 @@ void resetVariables();
 void socketMount();
 int parseUserCommand(char * command);
 void interactUDPServer();
+
 void userRegister();
+void registerServerFeedback();
 void userUnregister();
+void unregisterServerFeedback();
+void userLogin();
+void userLogout();
 
 /* Main Body */
 int main(int argc, char * argv[]) {
@@ -89,12 +102,18 @@ int main(int argc, char * argv[]) {
         switch(op) {
             case REGISTER:
                 userRegister();
+                registerServerFeedback();
                 break;
             case UNREGISTER:
                 userUnregister();
+                unregisterServerFeedback();
                 break;
+            case LOGIN:
+                userLogin();
+                break;
+            case LOGOUT:
+                userLogout();
         }
-        interactUDPServer();
         resetVariables();
     }
 }
@@ -107,13 +126,13 @@ void exitProtocol() {
 }
 
 void resetVariables() {
+    memset(tokenList, 0, sizeof(tokenList));
+    numTokens = 0;
     memset(buffer, 0, sizeof(buffer));
     memset(serverMessage, 0, sizeof(serverMessage));
     memset(commandCode, 0, sizeof(commandCode));
     memset(userID, 0, sizeof(userID));
     memset(userPW, 0, sizeof(userPW));
-    memset(tokenList, 0, sizeof(tokenList));
-    numTokens = 0;
 }
 
 /* Auxiliary Functions implementation */
@@ -192,7 +211,7 @@ int parseUserCommand(char * command) {
 
 void interactUDPServer() {
     memset(buffer, 0, sizeof(buffer)); // Clear to use it for recvfrom
-    if (flag) {
+    if (udpFlag) {
         n = sendto(fdDS, serverMessage, strlen(serverMessage), 0, resDS->ai_addr, resDS->ai_addrlen);
         if (n == -1) {
             fprintf(stderr, "Error on sending message ""%s"" to server. Please try again.\n", serverMessage);
@@ -204,7 +223,7 @@ void interactUDPServer() {
             exit(EXIT_FAILURE);
         }
         write(1, "DS: ", 4); write(1, buffer, n);
-        flag = 0;
+        udpFlag = 0;
     }
 }
 
@@ -226,13 +245,21 @@ void userRegister() {
     }
     strcpy(userPW, tokenList[1]);
     sprintf(serverMessage, "%s %s %s\n", commandCode, userID, userPW);
-    flag = 1;
+    udpFlag = 1;
+    interactUDPServer();
+}
+
+void registerServerFeedback() {
+    sscanf(buffer, "%s %s", serverResponseCode, serverResponseStatus);
+    if (strcmp(serverResponseCode, "RRG")) exitProtocol();
+    if (strcmp(serverResponseStatus, "OK") && strcmp(serverResponseStatus, "DUP") && strcmp(serverResponseStatus, "NOK")) exitProtocol();
+    if (!strcmp(serverResponseStatus, "OK")) printf("User %s succesfully registered with password %s.\n", userID, userPW);
 }
 
 void userUnregister() {
     reti = regcomp(&regex, "^ [0-9]{5} [a-zA-Z0-9]{8}$", REG_EXTENDED);
     if (reti) { printf("Error on parsing command. Please try again.\n"); return; }
-    if (regexec(&regex, buffer, (size_t) 0, NULL, 0)) { fprintf(stderr, "Invalid register command. Please try again.\n"); return; }
+    if (regexec(&regex, buffer, (size_t) 0, NULL, 0)) { fprintf(stderr, "Invalid unregister command. Please try again.\n"); return; }
     if (numTokens == 2) {
         sprintf(commandCode, "UNR");
     }
@@ -247,6 +274,46 @@ void userUnregister() {
     }
     strcpy(userPW, tokenList[1]);
     sprintf(serverMessage, "%s %s %s\n", commandCode, userID, userPW);
-    flag = 1;
+    udpFlag = 1;
+    interactUDPServer();
     // TODO: Servidor deve dar unsubscribe de todos os grupos do utilizador
+}
+
+void unregisterServerFeedback() {
+    sscanf(buffer, "%s %s", serverResponseCode, serverResponseStatus);
+    if (strcmp(serverResponseCode, "RUN")) exitProtocol();
+    if (strcmp(serverResponseStatus, "OK") && strcmp(serverResponseStatus, "NOK")) exitProtocol();
+    if (!strcmp(serverResponseStatus, "OK")) printf("User %s succesfully unregistered.\n", userID);
+}
+
+void userLogin() {
+    reti = regcomp(&regex, "^ [0-9]{5} [a-zA-Z0-9]{8}$", REG_EXTENDED);
+    if (reti) { printf("Error on parsing command. Please try again.\n"); return; }
+    if (regexec(&regex, buffer, (size_t) 0, NULL, 0)) { fprintf(stderr, "Invalid login command. Please try again.\n"); return; }
+    if (userSession == USER_LOGGEDIN) { fprintf(stderr, "User is already logged in. Please log out before you try to log in.\n"); return; }
+    if (numTokens == 2) {
+        sprintf(commandCode, "LOG");
+    }
+    if (strlen(tokenList[0]) != UID_SIZE) {
+        printf("Error. Invalid UID with: %s\n", tokenList[0]);
+        return;
+    }
+    strcpy(userID, tokenList[0]);
+    if (strlen(tokenList[1]) != PASSWORD_SIZE) {
+        printf("Error. Invalid Password with: %s\n", tokenList[1]);
+        return;
+    }
+    strcpy(userPW, tokenList[1]);
+    sprintf(serverMessage, "%s %s %s\n", commandCode, userID, userPW);
+    udpFlag = 1;
+    interactUDPServer();
+    userSession = USER_LOGGEDIN; strcpy(activeUser, userID); strcpy(activePassword, userPW);
+}
+
+void userLogout() {
+    sprintf(commandCode, "OUT");
+    sprintf(serverMessage, "%s %s %s\n", commandCode, activeUser, activePassword);
+    udpFlag = 1;
+    interactUDPServer();
+    userSession = USER_LOGGEDOUT; memset(activeUser, 0, sizeof(activeUser)); memset(activePassword, 0, sizeof(activePassword));
 }
