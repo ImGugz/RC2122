@@ -324,15 +324,7 @@ void userUnregister() {
     if (numTokens == 2) {
         sprintf(commandCode, "UNR");
     }
-    if (strlen(tokenList[0]) != UID_SIZE) {
-        printf("Error. Invalid UID with: %s\n", tokenList[0]);
-        return;
-    }
     strcpy(userID, tokenList[0]);
-    if (strlen(tokenList[1]) != PASSWORD_SIZE) {
-        printf("Error. Invalid Password with: %s\n", tokenList[1]);
-        return;
-    }
     strcpy(userPW, tokenList[1]);
     sprintf(serverMessage, "%s %s %s\n", commandCode, userID, userPW);
     udpFlag = 1;
@@ -359,15 +351,7 @@ void userLogin() {
     if (numTokens == 2) {
         sprintf(commandCode, "LOG");
     }
-    if (strlen(tokenList[0]) != UID_SIZE) {
-        printf("Error. Invalid UID with: %s\n", tokenList[0]);
-        return;
-    }
     strcpy(userID, tokenList[0]);
-    if (strlen(tokenList[1]) != PASSWORD_SIZE) {
-        printf("Error. Invalid Password with: %s\n", tokenList[1]);
-        return;
-    }
     strcpy(userPW, tokenList[1]);
     sprintf(serverMessage, "%s %s %s\n", commandCode, userID, userPW);
     udpFlag = 1;
