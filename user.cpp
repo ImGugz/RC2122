@@ -15,6 +15,8 @@ using namespace std;
 #define DSPORT_DEFAULT "58011" // change afterwards to group 18
 #define USER_LOGGEDOUT 0
 #define USER_LOGGEDIN 1
+#define FALSE 0
+#define TRUE 1
 
 #define MAX_COMMAND_SIZE 12
 #define MAX_IP_SIZE 64 // Including large domain names
@@ -46,7 +48,7 @@ using namespace std;
 #define GROUP_POST 12
 #define GROUP_RETRIEVE 13
 
-int fdDS, errcode;
+int fdDSUDP, fdDSTCP, errcode;
 ssize_t n;
 socklen_t addrlen;
 struct addrinfo hintsDS, *resDS;
@@ -55,8 +57,7 @@ struct sockaddr_in addrDS;
 char ipDS[MAX_IP_SIZE] = DSIP_DEFAULT;
 char portDS[MAX_PORT_SIZE] = DSPORT_DEFAULT;
 int userSession = USER_LOGGEDOUT;
-char activeUser[UID_SIZE];
-char activePassword[PASSWORD_SIZE];
+int groupSelected = FALSE;
 
 char * tokenList[MAX_NUM_TOKENS];
 int numTokens = 0;
@@ -69,6 +70,12 @@ char serverResponseStatus[MAX_COMMAND_STATUS_SIZE];
 
 char userID[UID_SIZE];
 char userPW[PASSWORD_SIZE];
+char userGroupID[MAX_NUM_TOKENS]; // we use this macro to avoid strcpy overflow
+char userGroupName[MAX_GROUPNAME_SIZE];
+
+char activeUser[UID_SIZE];
+char activePassword[PASSWORD_SIZE];
+char activeGroup[GROUPID_SIZE];
 
 regex_t regex; int reti;
 
@@ -86,6 +93,8 @@ void registerServerFeedback();
 void unregisterServerFeedback();
 void loginServerFeedback();
 void logoutServerFeedback();
+void subscribeServerFeedback();
+void unsubscribeServerFeedback();
 
 void userRegister();
 void userUnregister();
@@ -93,6 +102,11 @@ void userLogin();
 void userLogout();
 void userExit();
 void showGroups();
+void userGroupSubscribe();
+void userGroupUnsubscribe();
+void userGroupsList();
+void userSelectGroup();
+void selectServerFeedback();
 
 /* Main Body */
 int main(int argc, char * argv[]) {
@@ -134,6 +148,20 @@ int main(int argc, char * argv[]) {
             case GROUPS_LIST:
                 showGroups();
                 break;
+            case SUBSCRIBE:
+                userGroupSubscribe();
+                subscribeServerFeedback();
+                break;
+            case UNSUBSCRIBE:
+                userGroupUnsubscribe();
+                unsubscribeServerFeedback();
+                break;
+            case USER_GROUPS:
+                userGroupsList();
+                break;
+            case SELECT:
+                userSelectGroup();
+                break; 
         }
         resetVariables();
     }
@@ -141,7 +169,8 @@ int main(int argc, char * argv[]) {
 
 void exitProtocol() {
     freeaddrinfo(resDS);
-    close(fdDS);
+    close(fdDSUDP);
+    close(fdDSTCP);
     fprintf(stderr, "System error. Please try again.\n");
     exit(EXIT_FAILURE);
 }
@@ -154,6 +183,8 @@ void resetVariables() {
     memset(commandCode, 0, sizeof(commandCode));
     memset(userID, 0, sizeof(userID));
     memset(userPW, 0, sizeof(userPW));
+    memset(userGroupID, 0, sizeof(userGroupID));
+    memset(userGroupName, 0, sizeof(userGroupName));
 }
 
 /* Auxiliary Functions implementation */
@@ -189,9 +220,9 @@ void validateInput(int argc, char * argv[]) {
 }
 
 void socketMount() {
-    fdDS = socket(AF_INET, SOCK_DGRAM, 0);
-    if (fdDS == -1) {
-        fprintf(stderr, "Error creating Client TCP Socket. Please try again.\n");
+    fdDSUDP = socket(AF_INET, SOCK_DGRAM, 0);
+    if (fdDSUDP == -1) {
+        fprintf(stderr, "Error creating Client UDP Socket. Please try again.\n");
         exit(EXIT_FAILURE);
     }
     memset(&hintsDS, 0, sizeof(hintsDS));
@@ -203,11 +234,24 @@ void socketMount() {
         exit(EXIT_FAILURE);
     }
     // Estabelish TCP connection as well
-    n = connect(fdDS, resDS->ai_addr, resDS->ai_addrlen);
+    /* fdDSTCP = socket(AF_INET, SOCK_STREAM, 0);
+    if (fdDSTCP == -1) {
+        fprintf(stderr, "Error creating Client TCP Socket. Please try again.\n");
+        exit(EXIT_FAILURE);
+    }
+    memset(&hintsDS, 0, sizeof(hintsDS));
+    hintsDS.ai_family = AF_INET;
+    hintsDS.ai_socktype = SOCK_STREAM;
+    errcode = getaddrinfo(ipDS, portDS, &hintsDS, &resDS);
+    if (errcode != 0) {
+        fprintf(stderr, "Error getting DS IP info. Please try again.\n");
+        exit(EXIT_FAILURE);
+    }
+    n = connect(fdDSTCP, resDS->ai_addr, resDS->ai_addrlen);
     if (n == -1) {
         fprintf(stderr, "Error conecting to DS via TCP. Please try again.\n");
         exit(EXIT_FAILURE);
-    }
+    } */
 }
 
 int parseUserCommand(char * command) {
@@ -217,8 +261,8 @@ int parseUserCommand(char * command) {
     else if (strcmp(command, "logout") == 0) return LOGOUT;
     else if (strcmp(command, "exit") == 0) return USER_EXIT;
     else if ((strcmp(command, "groups") == 0) || (strcmp(command, "gl") == 0)) return GROUPS_LIST;
-    else if (strcmp(command, "subscribe") == 0) return SUBSCRIBE;
-    else if (strcmp(command, "unsubscribe") == 0) return UNSUBSCRIBE;
+    else if (strcmp(command, "subscribe") == 0 || strcmp(command, "s") == 0) return SUBSCRIBE;
+    else if (strcmp(command, "unsubscribe") == 0 || strcmp(command, "u") == 0) return UNSUBSCRIBE;
     else if ((strcmp(command, "my_groups") == 0) || (strcmp(command, "mgl") == 0)) return USER_GROUPS;
     else if ((strcmp(command, "select") == 0) || (strcmp(command, "sag") == 0)) return SELECT;
     else if ((strcmp(command, "ulist") == 0) || (strcmp(command, "ul") == 0)) return USERS_LIST;
@@ -233,12 +277,12 @@ int parseUserCommand(char * command) {
 void interactUDPServer() {
     memset(buffer, 0, sizeof(buffer)); // Clear to use it for recvfrom
     if (udpFlag) {
-        n = sendto(fdDS, serverMessage, strlen(serverMessage), 0, resDS->ai_addr, resDS->ai_addrlen);
+        n = sendto(fdDSUDP, serverMessage, strlen(serverMessage), 0, resDS->ai_addr, resDS->ai_addrlen);
         if (n == -1) {
             fprintf(stderr, "Error on sending message ""%s"" to server. Please try again.\n", serverMessage);
             exit(EXIT_FAILURE);
         }
-        n = recvfrom(fdDS, buffer, sizeof(buffer), 0, (struct sockaddr *) &addrDS, &addrlen);
+        n = recvfrom(fdDSUDP, buffer, sizeof(buffer), 0, (struct sockaddr *) &addrDS, &addrlen);
         if (n == -1) {
             fprintf(stderr, "Error on receiving message from server. Please try again.\n");
             exit(EXIT_FAILURE);
@@ -253,15 +297,6 @@ void userRegister() {
     if (regexec(&regex, buffer, (size_t) 0, NULL, 0)) { fprintf(stderr, "Invalid register command. Please try again.\n"); return; }
     if (numTokens == 2) {
         sprintf(commandCode, "REG");
-    }
-    if (strlen(tokenList[0]) != UID_SIZE) {
-        printf("Error. Invalid UID with: %s\n", tokenList[0]);
-        return;
-    }
-    strcpy(userID, tokenList[0]);
-    if (strlen(tokenList[1]) != PASSWORD_SIZE) {
-        printf("Error. Invalid Password with: %s\n", tokenList[1]);
-        return;
     }
     strcpy(userPW, tokenList[1]);
     sprintf(serverMessage, "%s %s %s\n", commandCode, userID, userPW);
@@ -378,7 +413,7 @@ void logoutServerFeedback() {
 
 void userExit() {
     freeaddrinfo(resDS);
-    close(fdDS);
+    close(fdDSUDP);
     // TODO: Check TCP
     exit(EXIT_SUCCESS);
 }
@@ -389,27 +424,27 @@ void interactUDPServerGroups() {
     int numGroups;
     char * groupsList[3*MAX_GROUPS];
     int aux = 0;
-    n = sendto(fdDS, serverMessage, strlen(serverMessage), 0, resDS->ai_addr, resDS->ai_addrlen);
+    n = sendto(fdDSUDP, serverMessage, strlen(serverMessage), 0, resDS->ai_addr, resDS->ai_addrlen);
     if (n == -1) {
         fprintf(stderr, "Error on sending message ""%s"" to server. Please try again.\n", serverMessage);
         exit(EXIT_FAILURE);
     }
-    n = recvfrom(fdDS, groupBufferTemp, sizeof(groupBufferTemp), 0, (struct sockaddr *) &addrDS, &addrlen);
+    n = recvfrom(fdDSUDP, groupBufferTemp, sizeof(groupBufferTemp), 0, (struct sockaddr *) &addrDS, &addrlen);
     if (n == -1) {
-        fprintf(stderr, "sError on sending message ""%s"" to server. Please try again.\n", serverMessage);
+        fprintf(stderr, "Error on sending message ""%s"" to server. Please try again.\n", serverMessage);
         exit(EXIT_FAILURE);
     }
     sscanf(groupBufferTemp, "%s %d ", serverResponseCode, &numGroups);
-    if (strcmp(serverResponseCode, "RGL")) exitProtocol();
-    if (numGroups == 0) { printf("There are no groups.\n"); return; }
+    if (strcmp(serverResponseCode, "RGL") && strcmp(serverResponseCode, "RGM")) exitProtocol();
+    printf("%d groups: (GID | GName | Last MID)\n", numGroups);
+    if (numGroups == 0) { return; }
     groupBuffer = (numGroups >= 10) ? groupBufferTemp + 7 : groupBufferTemp + 6;
-    token = strtok(groupBuffer, " ");
+    token = strtok(groupBuffer, " \n");
     while (token != NULL && aux < 3 * MAX_GROUPS) {
         groupsList[aux++] = token;
-        token = strtok(NULL, " ");
+        token = strtok(NULL, " \n");
     }
-    printf("There are %d groups: (GID | GName | Last MID)\n", numGroups);
-    for (int i = 0; i < aux; i += 3) {
+    for (int i = 0; i < aux-1; i += 3) {
         printf("%s %s %s\n", groupsList[i], groupsList[i+1], groupsList[i+2]);
     }
     udpFlag = 0;
@@ -420,4 +455,86 @@ void showGroups() {
     sprintf(serverMessage, "%s\n", commandCode);
     udpFlag = 1;
     interactUDPServerGroups();
+}
+
+void userGroupSubscribe() {
+    reti = regcomp(&regex, "^ [0-9]{1,2} [a-zA-Z0-9_-]{1,24}$", REG_EXTENDED);
+    if (reti) { printf("Error on parsing command arguments. Please try again.\n"); return; }
+    if (regexec(&regex, buffer, (size_t) 0, NULL, 0)) { fprintf(stderr, "Invalid subscribe command. Please try again.\n"); return; }
+    if (userSession == USER_LOGGEDOUT) { fprintf(stderr, "Please login before you subscribe to a group.\n"); return; }
+    if (numTokens == 2) {
+        sprintf(commandCode, "GSR");
+    }
+    if (!strcmp(tokenList[0], "00")) { fprintf(stderr, "This group doesn't exist. Please try again.\n"); return; }
+    if (!strcmp(tokenList[0], "0")) strcpy(userGroupID, "00");
+    else strcpy(userGroupID, tokenList[0]);
+    strcpy(userGroupName, tokenList[1]);
+    sprintf(serverMessage, "%s %s %s %s\n", commandCode, activeUser, userGroupID, userGroupName);
+    udpFlag = 1;
+    interactUDPServer();
+}
+
+void subscribeServerFeedback() {
+    if (udpFlag) {
+        sscanf(buffer, "%s %s", serverResponseCode, serverResponseStatus);
+        if (strcmp(serverResponseCode, "RGS")) exitProtocol();
+        if (strcmp(serverResponseStatus, "NEW") && strcmp(serverResponseStatus, "E_USR") 
+        && strcmp(serverResponseStatus, "E_GRP") && strcmp(serverResponseStatus, "E_GNAME")
+        && strcmp(serverResponseStatus, "E_FULL") && strcmp(serverResponseStatus, "OK")
+        && strcmp(serverResponseStatus, "NOK")) exitProtocol();
+        if (!strcmp(serverResponseStatus, "OK")) printf("User %s has succesfully subscribed to %s.\n", activeUser, userGroupName);
+        if (!strcmp(serverResponseStatus, "NEW")) printf("Group %s has been succesfully created.\n", userGroupName);
+        if (!strcmp(serverResponseStatus, "E_USR")) printf("User ID %s that is logged in is invalid. Please try again.\n", activeUser);
+        if (!strcmp(serverResponseStatus, "E_GRP")) printf("Group ID %s is invalid. Please try again.\n", userGroupID);
+        if (!strcmp(serverResponseStatus, "E_GNAME")) printf("Group name %s is invalid. Please try again.\n", userGroupName);
+        if (!strcmp(serverResponseStatus, "E_FULL")) printf("Maximum of 100 groups has been reached. Please try again later.\n");
+        if (!strcmp(serverResponseStatus, "NOK")) printf("The subscribing process has failed. Please try again later.\n");
+        udpFlag = 0;
+    }
+}
+
+void userGroupUnsubscribe() {
+    reti = regcomp(&regex, "^ [0-9]{2}$", REG_EXTENDED);
+    if (reti) { printf("Error on parsing command arguments. Please try again.\n"); return; }
+    if (regexec(&regex, buffer, (size_t) 0, NULL, 0)) { fprintf(stderr, "Invalid unsubscribe command. Please try again.\n"); return; }
+    if (userSession == USER_LOGGEDOUT) { fprintf(stderr, "Please login before you unsubscribe to a group.\n"); return; }
+    if (numTokens == 1) {
+        sprintf(commandCode, "GUR");
+    }
+    strcpy(userGroupID, tokenList[0]);
+    sprintf(serverMessage, "%s %s %s\n", commandCode, activeUser, userGroupID);
+    udpFlag = 1;
+    interactUDPServer();
+}
+
+void unsubscribeServerFeedback() {
+    if (udpFlag) {
+        sscanf(buffer, "%s %s", serverResponseCode, serverResponseStatus);
+        if (strcmp(serverResponseCode, "RGU")) exitProtocol();
+        if (strcmp(serverResponseStatus, "OK") && strcmp(serverResponseStatus, "E_USR") 
+        && strcmp(serverResponseStatus, "E_GRP") && strcmp(serverResponseStatus, "NOK")) exitProtocol();
+        if (!strcmp(serverResponseStatus, "OK")) printf("User %s has succesfully unsubscribed to group with ID %s.\n", activeUser, userGroupID);
+        if (!strcmp(serverResponseStatus, "NEW")) printf("Group %s has been succesfully created.\n", userGroupName);
+        if (!strcmp(serverResponseStatus, "E_USR")) printf("User ID %s that is logged in is invalid. Please try again.\n", activeUser);
+        if (!strcmp(serverResponseStatus, "E_GRP")) printf("Group ID %s is invalid. Please try again.\n", userGroupID);
+        if (!strcmp(serverResponseStatus, "NOK")) printf("The unsubscribing process has failed. Please try again later.\n");
+        udpFlag = 0;
+    }
+}
+
+void userGroupsList() {
+    if (userSession == USER_LOGGEDOUT) { fprintf(stderr, "Please login before requesting user's groups.\n"); return; }
+    sprintf(commandCode, "GLM");
+    sprintf(serverMessage, "%s %s\n", commandCode, activeUser);
+    udpFlag = 1;
+    interactUDPServerGroups();
+}
+
+void userSelectGroup() {
+    reti = regcomp(&regex, "^ [0-9]{2}$", REG_EXTENDED);
+    if (reti) { printf("Error on parsing command arguments. Please try again.\n"); return; }
+    if (regexec(&regex, buffer, (size_t) 0, NULL, 0)) { fprintf(stderr, "Invalid unsubscribe command. Please try again.\n"); return; }
+    if (userSession == USER_LOGGEDOUT) { fprintf(stderr, "Please login before you select a group.\n"); return; }
+    if (numTokens == 1) { strcpy(activeGroup, tokenList[0]); groupSelected = TRUE; printf("Group %s selected.\n", activeGroup); }
+    else exitProtocol();
 }
