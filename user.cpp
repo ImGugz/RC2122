@@ -298,6 +298,7 @@ void userRegister() {
     if (numTokens == 2) {
         sprintf(commandCode, "REG");
     }
+    strcpy(userID, tokenList[0]);
     strcpy(userPW, tokenList[1]);
     sprintf(serverMessage, "%s %s %s\n", commandCode, userID, userPW);
     udpFlag = 1;
