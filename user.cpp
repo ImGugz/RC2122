@@ -25,7 +25,7 @@ using namespace std;
 #define MAX_NUM_TOKENS 4
 #define MAX_COMMAND_CODE_SIZE 4
 #define MAX_COMMAND_STATUS_SIZE 6
-#define UID_SIZE 5
+#define UID_SIZE 6
 #define PASSWORD_SIZE 8
 #define GROUPID_SIZE 2
 #define MAX_GROUPNAME_SIZE 24
@@ -298,6 +298,8 @@ void userRegister() {
     if (numTokens == 2) {
         sprintf(commandCode, "REG");
     }
+    puts(tokenList[0]);
+    puts(tokenList[1]);
     strcpy(userID, tokenList[0]);
     strcpy(userPW, tokenList[1]);
     sprintf(serverMessage, "%s %s %s\n", commandCode, userID, userPW);
@@ -430,6 +432,7 @@ void interactUDPServerGroups() {
         token = strtok(NULL, " \n");
     }
     for (int i = 0; i < aux-1; i += 3) {
+        if ((strlen(groupsList[i]) != 2) || (strlen(groupsList[i+1]) > 24) || (strlen(groupsList[i+2]) != 4)) exitProtocol();
         printf("%s %s %s\n", groupsList[i], groupsList[i+1], groupsList[i+2]);
     }
     udpFlag = 0;
