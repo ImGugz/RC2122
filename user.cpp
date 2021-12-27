@@ -18,6 +18,9 @@ using namespace std;
 #define FALSE 0
 #define TRUE 1
 
+#define SUCCESS 99
+#define FAILURE -3
+
 #define MAX_COMMAND_SIZE 12
 #define MAX_IP_SIZE 64 // Including large domain names
 #define MAX_PORT_SIZE 6 // 65535 (5+1)
@@ -34,6 +37,7 @@ using namespace std;
 #define MAX_GROUP_STRING_SIZE 3307 // RGL + backspace + N(max is 99) + 100 * (backspace + GID(max is 99) + backspace + GName(max 24) + backspace + MID(max 9999)) 
 
 /* Constants used for switch on commands */
+#define INVALID_COMMAND -1
 #define REGISTER 1
 #define UNREGISTER 2
 #define LOGIN 3
@@ -47,11 +51,13 @@ using namespace std;
 #define USERS_LIST 11
 #define GROUP_POST 12
 #define GROUP_RETRIEVE 13
+#define SHOW_SELECTED 14
+#define SHOW_USER 15
 
 int fdDSUDP, fdDSTCP, errcode;
 ssize_t n;
 socklen_t addrlen;
-struct addrinfo hintsDS, *resDS;
+struct addrinfo hintsDS, *resDSUDP, *resDSTCP;
 struct sockaddr_in addrDS;
 
 char ipDS[MAX_IP_SIZE] = DSIP_DEFAULT;
@@ -86,6 +92,8 @@ void resetVariables();
 void socketMount();
 int parseUserCommand(char * command);
 
+int startTCP();
+
 void interactUDPServer();
 void interactUDPServerGroups();
 
@@ -102,11 +110,14 @@ void userLogin();
 void userLogout();
 void userExit();
 void showGroups();
+void showUsers();
 void userGroupSubscribe();
 void userGroupUnsubscribe();
 void userGroupsList();
 void userSelectGroup();
 void selectServerFeedback();
+void showSelectedGroup();
+void showActiveUser();
 
 /* Main Body */
 int main(int argc, char * argv[]) {
@@ -116,6 +127,7 @@ int main(int argc, char * argv[]) {
     socketMount();
     while (scanf("%s", command) != -1) {
         op = parseUserCommand(command);
+        if(op==INVALID_COMMAND) continue;
         char bufferTemp[MAX_BUFFER_SIZE];
         fgets(bufferTemp, sizeof(bufferTemp), stdin);
         strcpy(buffer, bufferTemp);
@@ -148,6 +160,9 @@ int main(int argc, char * argv[]) {
             case GROUPS_LIST:
                 showGroups();
                 break;
+            case USERS_LIST:
+                showUsers();
+                break;
             case SUBSCRIBE:
                 userGroupSubscribe();
                 subscribeServerFeedback();
@@ -161,14 +176,24 @@ int main(int argc, char * argv[]) {
                 break;
             case SELECT:
                 userSelectGroup();
-                break; 
+                break;
+            case SHOW_SELECTED:
+                showSelectedGroup();
+                break;
+            case SHOW_USER:
+                showActiveUser();
+                break;
+            default:
+                //extra safety check
+                fprintf(stderr, "Invalid command. Please try again.\n");
         }
         resetVariables();
     }
 }
 
 void exitProtocol() {
-    freeaddrinfo(resDS);
+    freeaddrinfo(resDSUDP);
+    freeaddrinfo(resDSTCP);
     close(fdDSUDP);
     close(fdDSTCP);
     fprintf(stderr, "System error. Please try again.\n");
@@ -204,6 +229,10 @@ void validateInput(int argc, char * argv[]) {
                 strcpy(ipDS, optarg);
                 break;
             case 'p':
+                if (strcmp(optarg, "-n") == 0) { // corner case
+                    fprintf(stderr, "Missing argument. Please try again.\n");
+                    exit(EXIT_FAILURE);
+                }
                 strcpy(portDS, optarg);
                 break;
             case ':':
@@ -211,10 +240,10 @@ void validateInput(int argc, char * argv[]) {
                 exit(EXIT_FAILURE);
             case '?':
                 printf("Unknown flag. Please try again.\n");
-                break;
+                exit(EXIT_FAILURE);
             default:
                 printf("Something is wrong here. Please try again.\n");
-                break;
+                exit(EXIT_FAILURE);
         }
     }
 }
@@ -228,33 +257,16 @@ void socketMount() {
     memset(&hintsDS, 0, sizeof(hintsDS));
     hintsDS.ai_family = AF_INET;
     hintsDS.ai_socktype = SOCK_DGRAM;
-    errcode = getaddrinfo(ipDS, portDS, &hintsDS, &resDS);
+    errcode = getaddrinfo(ipDS, portDS, &hintsDS, &resDSUDP);
     if (errcode != 0) {
         fprintf(stderr, "Error getting DS IP info. Please try again.\n");
+        close(fdDSUDP);
         exit(EXIT_FAILURE);
     }
-    // Estabelish TCP connection as well
-    /* fdDSTCP = socket(AF_INET, SOCK_STREAM, 0);
-    if (fdDSTCP == -1) {
-        fprintf(stderr, "Error creating Client TCP Socket. Please try again.\n");
-        exit(EXIT_FAILURE);
-    }
-    memset(&hintsDS, 0, sizeof(hintsDS));
-    hintsDS.ai_family = AF_INET;
-    hintsDS.ai_socktype = SOCK_STREAM;
-    errcode = getaddrinfo(ipDS, portDS, &hintsDS, &resDS);
-    if (errcode != 0) {
-        fprintf(stderr, "Error getting DS IP info. Please try again.\n");
-        exit(EXIT_FAILURE);
-    }
-    n = connect(fdDSTCP, resDS->ai_addr, resDS->ai_addrlen);
-    if (n == -1) {
-        fprintf(stderr, "Error conecting to DS via TCP. Please try again.\n");
-        exit(EXIT_FAILURE);
-    } */
 }
 
 int parseUserCommand(char * command) {
+    
     if (strcmp(command, "reg") == 0) return REGISTER;
     else if ((strcmp(command, "unregister") == 0) || (strcmp(command, "unr") == 0)) return UNREGISTER;
     else if (strcmp(command, "login") == 0) return LOGIN;
@@ -268,24 +280,26 @@ int parseUserCommand(char * command) {
     else if ((strcmp(command, "ulist") == 0) || (strcmp(command, "ul") == 0)) return USERS_LIST;
     else if (strcmp(command, "post") == 0) return GROUP_POST;
     else if (strcmp(command, "retrieve") == 0) return GROUP_RETRIEVE;
+    else if ((strcmp(command, "showgid") == 0) || (strcmp(command, "sg") == 0)) return SHOW_SELECTED;
+    else if ((strcmp(command, "showuid") == 0) || (strcmp(command, "su") == 0)) return SHOW_USER;
     else {
-        fprintf(stderr, "Invalid user command. Please try again.\n");
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "Invalid user command code. Please try again.\n");
+        return INVALID_COMMAND;
     }
 }
 
 void interactUDPServer() {
     memset(buffer, 0, sizeof(buffer)); // Clear to use it for recvfrom
     if (udpFlag) {
-        n = sendto(fdDSUDP, serverMessage, strlen(serverMessage), 0, resDS->ai_addr, resDS->ai_addrlen);
+        n = sendto(fdDSUDP, serverMessage, strlen(serverMessage), 0, resDSUDP->ai_addr, resDSUDP->ai_addrlen);
         if (n == -1) {
             fprintf(stderr, "Error on sending message ""%s"" to server. Please try again.\n", serverMessage);
-            exit(EXIT_FAILURE);
+            return;
         }
         n = recvfrom(fdDSUDP, buffer, sizeof(buffer), 0, (struct sockaddr *) &addrDS, &addrlen);
         if (n == -1) {
             fprintf(stderr, "Error on receiving message from server. Please try again.\n");
-            exit(EXIT_FAILURE);
+            return;
         }
         write(1, "DS: ", 4); write(1, buffer, n); // TO REMOVE AFTERWARDS -> ONLY SERVES FEEDBACK DEBUGGING PURPOSES
     }
@@ -399,7 +413,8 @@ void logoutServerFeedback() {
 }
 
 void userExit() {
-    freeaddrinfo(resDS);
+    freeaddrinfo(resDSUDP);
+    freeaddrinfo(resDSTCP);
     close(fdDSUDP);
     // TODO: Check TCP
     exit(EXIT_SUCCESS);
@@ -411,15 +426,15 @@ void interactUDPServerGroups() {
     int numGroups;
     char * groupsList[3*MAX_GROUPS];
     int aux = 0;
-    n = sendto(fdDSUDP, serverMessage, strlen(serverMessage), 0, resDS->ai_addr, resDS->ai_addrlen);
+    n = sendto(fdDSUDP, serverMessage, strlen(serverMessage), 0, resDSUDP->ai_addr, resDSUDP->ai_addrlen);
     if (n == -1) {
         fprintf(stderr, "Error on sending message ""%s"" to server. Please try again.\n", serverMessage);
-        exit(EXIT_FAILURE);
+        return;
     }
     n = recvfrom(fdDSUDP, groupBufferTemp, sizeof(groupBufferTemp), 0, (struct sockaddr *) &addrDS, &addrlen);
     if (n == -1) {
         fprintf(stderr, "Error on sending message ""%s"" to server. Please try again.\n", serverMessage);
-        exit(EXIT_FAILURE);
+        return;
     }
     sscanf(groupBufferTemp, "%s %d ", serverResponseCode, &numGroups);
     if (strcmp(serverResponseCode, "RGL") && strcmp(serverResponseCode, "RGM")) exitProtocol();
@@ -521,8 +536,80 @@ void userGroupsList() {
 void userSelectGroup() {
     reti = regcomp(&regex, "^ [0-9]{2}$", REG_EXTENDED);
     if (reti) { printf("Error on parsing command arguments. Please try again.\n"); return; }
-    if (regexec(&regex, buffer, (size_t) 0, NULL, 0)) { fprintf(stderr, "Invalid unsubscribe command. Please try again.\n"); return; }
+    if (regexec(&regex, buffer, (size_t) 0, NULL, 0)) { fprintf(stderr, "Invalid select command. Please try again.\n"); return; }
     if (userSession == USER_LOGGEDOUT) { fprintf(stderr, "Please login before you select a group.\n"); return; }
     if (numTokens == 1) { strcpy(activeGroup, tokenList[0]); groupSelected = TRUE; printf("Group %s selected.\n", activeGroup); }
     else exitProtocol();
+}
+
+void showSelectedGroup() {
+    printf("Selected Group: %s\n", activeGroup);
+}
+
+void showActiveUser() {
+    printf("Active User ID: %s\n", activeUser);
+}
+
+void showUsers() {
+    memset(buffer, 0, sizeof(buffer));
+
+    if (startTCP() != SUCCESS) return;
+    sprintf(serverMessage, "ULS %s\n", activeGroup);
+
+    n = write(fdDSTCP, serverMessage, strlen(serverMessage));
+    if(n == -1) {
+        fprintf(stderr, "Error sending command to server. Please try again.\n");
+        close(fdDSTCP);
+        return;
+    }
+
+    n = read(fdDSTCP, buffer, sizeof(buffer));
+    sscanf(buffer, "%s %s", serverResponseCode, serverResponseStatus);
+    if (strcmp(serverResponseCode, "RUL") != 0) {
+        fprintf(stderr, "Error reading response from server. Please try again.\n");
+        close(fdDSTCP);
+        return;
+    }
+
+    if (strcmp(serverResponseStatus, "NOK") == 0){
+        printf("Selected group does not exist.\n");
+        close(fdDSTCP);
+        return;
+    }
+
+    while(n = read(fdDSTCP, buffer, sizeof(buffer))){
+        if(n == -1) {
+            fprintf(stderr, "Error reading response from server. Please try again.\n");
+            close(fdDSTCP);
+            return;
+        }
+        printf("%s\n", buffer);
+        memset(buffer, 0, sizeof(buffer));
+    }
+    close(fdDSTCP);
+}
+
+int startTCP() {
+    // Establish TCP connection as well
+    fdDSTCP = socket(AF_INET, SOCK_STREAM, 0);
+    if (fdDSTCP == -1) {
+        fprintf(stderr, "Error creating Client TCP Socket. Please try again.\n");
+        return FAILURE;
+    }
+    memset(&hintsDS, 0, sizeof(hintsDS));
+    hintsDS.ai_family = AF_INET;
+    hintsDS.ai_socktype = SOCK_STREAM;
+    errcode = getaddrinfo(ipDS, portDS, &hintsDS, &resDSTCP);
+    if (errcode != 0) {
+        fprintf(stderr, "Error getting DS IP info. Please try again.\n");
+        close(fdDSTCP);
+        return FAILURE;
+    }
+    n = connect(fdDSTCP, resDSTCP->ai_addr, resDSTCP->ai_addrlen);
+    if (n == -1) {
+        fprintf(stderr, "Error conecting to DS via TCP. Please try again.\n");
+        close(fdDSTCP);
+        return FAILURE;
+    }
+    return SUCCESS;
 }
