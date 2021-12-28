@@ -6,10 +6,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
-#include <map>
-#include <string>
-
-using namespace std;
+#include <sys/stat.h>
 
 #define DSIP_DEFAULT "127.0.0.1"
 #define DSPORT_DEFAULT "58011" // change afterwards to group 18
@@ -24,8 +21,8 @@ using namespace std;
 #define MAX_COMMAND_SIZE 12
 #define MAX_IP_SIZE 64 // Including large domain names
 #define MAX_PORT_SIZE 6 // 65535 (5+1)
-#define MAX_BUFFER_SIZE 128
-#define MAX_NUM_TOKENS 4
+#define MAX_BUFFER_SIZE 512
+#define MAX_NUM_TOKENS 256 // Textsize 240 + Extras
 #define MAX_COMMAND_CODE_SIZE 4
 #define MAX_COMMAND_STATUS_SIZE 6
 #define UID_SIZE 6
@@ -35,6 +32,9 @@ using namespace std;
 #define MSGID_SIZE 4
 #define MAX_GROUPS 100
 #define MAX_GROUP_STRING_SIZE 3307 // RGL + backspace + N(max is 99) + 100 * (backspace + GID(max is 99) + backspace + GName(max 24) + backspace + MID(max 9999)) 
+#define MAX_TEXT_SIZE 240
+#define MAX_FILENAME_SIZE 24
+#define SIZE_TO_READ 256
 
 /* Constants used for switch on commands */
 #define INVALID_COMMAND -1
@@ -118,6 +118,8 @@ void userSelectGroup();
 void selectServerFeedback();
 void showSelectedGroup();
 void showActiveUser();
+void postInGroup();
+void retrieveMessage();
 
 /* Main Body */
 int main(int argc, char * argv[]) {
@@ -183,9 +185,12 @@ int main(int argc, char * argv[]) {
             case SHOW_USER:
                 showActiveUser();
                 break;
-            default:
-                //extra safety check
-                fprintf(stderr, "Invalid command. Please try again.\n");
+            case GROUP_POST:
+                postInGroup();
+                break;
+            case GROUP_RETRIEVE:
+                retrieveMessage();
+                break;
         }
         resetVariables();
     }
@@ -279,9 +284,9 @@ int parseUserCommand(char * command) {
     else if ((strcmp(command, "select") == 0) || (strcmp(command, "sag") == 0)) return SELECT;
     else if ((strcmp(command, "ulist") == 0) || (strcmp(command, "ul") == 0)) return USERS_LIST;
     else if (strcmp(command, "post") == 0) return GROUP_POST;
-    else if (strcmp(command, "retrieve") == 0) return GROUP_RETRIEVE;
-    else if ((strcmp(command, "showgid") == 0) || (strcmp(command, "sg") == 0)) return SHOW_SELECTED;
-    else if ((strcmp(command, "showuid") == 0) || (strcmp(command, "su") == 0)) return SHOW_USER;
+    else if ((strcmp(command, "retrieve") == 0) || (strcmp(command, "r") == 0)) return GROUP_RETRIEVE;
+    else if ((strcmp(command, "showgid") == 0) || (strcmp(command, "sg") == 0)) return SHOW_SELECTED; // Opcional 1
+    else if ((strcmp(command, "showuid") == 0) || (strcmp(command, "su") == 0)) return SHOW_USER; // Opcional 2
     else {
         fprintf(stderr, "Invalid user command code. Please try again.\n");
         return INVALID_COMMAND;
@@ -309,6 +314,7 @@ void userRegister() {
     reti = regcomp(&regex, "^ [0-9]{5} [a-zA-Z0-9]{8}$", REG_EXTENDED);
     if (reti) { printf("Error on parsing command. Please try again.\n"); return; }
     if (regexec(&regex, buffer, (size_t) 0, NULL, 0)) { fprintf(stderr, "Invalid register command. Please try again.\n"); return; }
+    regfree(&regex);
     if (numTokens == 2) {
         sprintf(commandCode, "REG");
     }
@@ -337,6 +343,7 @@ void userUnregister() {
     reti = regcomp(&regex, "^ [0-9]{5} [a-zA-Z0-9]{8}$", REG_EXTENDED);
     if (reti) { printf("Error on parsing command. Please try again.\n"); return; }
     if (regexec(&regex, buffer, (size_t) 0, NULL, 0)) { fprintf(stderr, "Invalid unregister command. Please try again.\n"); return; }
+    regfree(&regex);
     if (numTokens == 2) {
         sprintf(commandCode, "UNR");
     }
@@ -363,6 +370,7 @@ void userLogin() {
     reti = regcomp(&regex, "^ [0-9]{5} [a-zA-Z0-9]{8}$", REG_EXTENDED);
     if (reti) { printf("Error on parsing command. Please try again.\n"); return; }
     if (regexec(&regex, buffer, (size_t) 0, NULL, 0)) { fprintf(stderr, "Invalid login command. Please try again.\n"); return; }
+    regfree(&regex);
     if (userSession == USER_LOGGEDIN) { fprintf(stderr, "User is already logged in. Please log out before you try to log in.\n"); return; }
     if (numTokens == 2) {
         sprintf(commandCode, "LOG");
@@ -433,7 +441,7 @@ void interactUDPServerGroups() {
     }
     n = recvfrom(fdDSUDP, groupBufferTemp, sizeof(groupBufferTemp), 0, (struct sockaddr *) &addrDS, &addrlen);
     if (n == -1) {
-        fprintf(stderr, "Error on sending message ""%s"" to server. Please try again.\n", serverMessage);
+        fprintf(stderr, "Error on receiving message from server. Please try again.\n");
         return;
     }
     sscanf(groupBufferTemp, "%s %d ", serverResponseCode, &numGroups);
@@ -464,6 +472,7 @@ void userGroupSubscribe() {
     reti = regcomp(&regex, "^ [0-9]{1,2} [a-zA-Z0-9_-]{1,24}$", REG_EXTENDED);
     if (reti) { printf("Error on parsing command arguments. Please try again.\n"); return; }
     if (regexec(&regex, buffer, (size_t) 0, NULL, 0)) { fprintf(stderr, "Invalid subscribe command. Please try again.\n"); return; }
+    regfree(&regex);
     if (userSession == USER_LOGGEDOUT) { fprintf(stderr, "Please login before you subscribe to a group.\n"); return; }
     if (numTokens == 2) {
         sprintf(commandCode, "GSR");
@@ -500,6 +509,7 @@ void userGroupUnsubscribe() {
     reti = regcomp(&regex, "^ [0-9]{2}$", REG_EXTENDED);
     if (reti) { printf("Error on parsing command arguments. Please try again.\n"); return; }
     if (regexec(&regex, buffer, (size_t) 0, NULL, 0)) { fprintf(stderr, "Invalid unsubscribe command. Please try again.\n"); return; }
+    regfree(&regex);
     if (userSession == USER_LOGGEDOUT) { fprintf(stderr, "Please login before you unsubscribe to a group.\n"); return; }
     if (numTokens == 1) {
         sprintf(commandCode, "GUR");
@@ -537,6 +547,7 @@ void userSelectGroup() {
     reti = regcomp(&regex, "^ [0-9]{2}$", REG_EXTENDED);
     if (reti) { printf("Error on parsing command arguments. Please try again.\n"); return; }
     if (regexec(&regex, buffer, (size_t) 0, NULL, 0)) { fprintf(stderr, "Invalid select command. Please try again.\n"); return; }
+    regfree(&regex);
     if (userSession == USER_LOGGEDOUT) { fprintf(stderr, "Please login before you select a group.\n"); return; }
     if (numTokens == 1) { strcpy(activeGroup, tokenList[0]); groupSelected = TRUE; printf("Group %s selected.\n", activeGroup); }
     else exitProtocol();
@@ -551,42 +562,256 @@ void showActiveUser() {
 }
 
 void showUsers() {
-    memset(buffer, 0, sizeof(buffer));
-
-    if (startTCP() != SUCCESS) return;
+    char groupBufferTemp[31] = ""; // 33 = 3 + 1 + 3 (NOK) + 1 + 24 + 1 (1's are backspaces)
+    char ulGName[24] = ""; // 25 = 24 max + 1
+    char userInGroup[6] = "";
+    char * ptrAux;
+    if (groupSelected == FALSE) {
+        fprintf(stderr, "Please select a group before executing this command.\n");
+        return;
+    }
+    if (startTCP() != SUCCESS) return; // TODO: Abortar mesmo execução. Comportamento errático!
     sprintf(serverMessage, "ULS %s\n", activeGroup);
-
     n = write(fdDSTCP, serverMessage, strlen(serverMessage));
     if(n == -1) {
         fprintf(stderr, "Error sending command to server. Please try again.\n");
         close(fdDSTCP);
         return;
     }
-
-    n = read(fdDSTCP, buffer, sizeof(buffer));
-    sscanf(buffer, "%s %s", serverResponseCode, serverResponseStatus);
+    n = read(fdDSTCP, groupBufferTemp, sizeof(groupBufferTemp));
+    sscanf(groupBufferTemp, "%s %s %s ", serverResponseCode, serverResponseStatus, ulGName);
     if (strcmp(serverResponseCode, "RUL") != 0) {
         fprintf(stderr, "Error reading response from server. Please try again.\n");
         close(fdDSTCP);
         return;
     }
-
     if (strcmp(serverResponseStatus, "NOK") == 0){
         printf("Selected group does not exist.\n");
         close(fdDSTCP);
         return;
     }
 
+    printf("Users subscribed to %s:\n", ulGName);
     while(n = read(fdDSTCP, buffer, sizeof(buffer))){
         if(n == -1) {
             fprintf(stderr, "Error reading response from server. Please try again.\n");
             close(fdDSTCP);
             return;
         }
-        printf("%s\n", buffer);
+        ptrAux = buffer;
+        while (sscanf(ptrAux, " %s", userInGroup) > 0) {
+            printf("%s\n", userInGroup);
+            ptrAux = ptrAux + 6;
+        }
         memset(buffer, 0, sizeof(buffer));
     }
     close(fdDSTCP);
+}
+
+void postInGroup() {
+    char textPost[MAX_TEXT_SIZE];
+    char fileName[MAX_FILENAME_SIZE] = "";
+    char postBufferTemp[8] = "";
+    char postMID[5] = "";
+    char * fileBuffer = 0;
+    if (groupSelected == FALSE) {
+        fprintf(stderr, "Please select a group before executing this command.\n");
+        return;
+    }
+    if (startTCP() != SUCCESS) return; // TODO: Abortar mesmo execução. Comportamento errático!
+    sscanf(buffer, " \"%[^\"]\" %s", textPost, fileName);
+    int textSize = strlen(textPost);
+    sprintf(serverMessage, "PST %s %s %d %s\n", activeUser, activeGroup, textSize, textPost);
+    if (strlen(fileName) > 0) { // There was an optional file input
+        reti = regcomp(&regex, "^[a-zA-Z0-9_-]{1,20}[.]{1}[a-z]{3}$", REG_EXTENDED);
+        if (reti) {
+            fprintf(stderr, "Error on compiling regex on post command. Please try again.\n"); 
+            close(fdDSTCP); 
+            return;
+        }
+        if (regexec(&regex, fileName, (size_t) 0, NULL, 0)) { 
+            fprintf(stderr, "Invalid file name in post command. Please try again.\n"); 
+            close(fdDSTCP); 
+            return;
+        }
+        regfree(&regex);
+        FILE * fp = fopen(fileName, "rb");
+        if (!fp) {
+            fprintf(stderr, "File given on post command does not exist. Please try again.\n");
+            close(fdDSTCP);
+            return;
+        }
+        fseek(fp, 0L, SEEK_END);
+        int res = ftell(fp); // MAX 10 Digits 2 ^ 31 -1 = 2147483647 bytes -> int dá e chega
+        fseek (fp, 0, SEEK_SET);
+        fileBuffer = (char *) malloc(res + 1); // For \0
+        if (fileBuffer) { fread(fileBuffer, 1, res, fp); }
+        fclose(fp);
+        fileBuffer[res] = '\0';
+        sprintf(serverMessage, "PST %s %s %d %s %s %d %s\n", activeUser, activeGroup, textSize, textPost, fileName, res, fileBuffer);
+    }
+    n = write(fdDSTCP, serverMessage, strlen(serverMessage));
+    if(n == -1) {
+        fprintf(stderr, "Error sending command to server. Please try again.\n");
+        close(fdDSTCP);
+        return;
+    }
+    n = read(fdDSTCP, postBufferTemp, sizeof(postBufferTemp));
+    postBufferTemp[n] = '\0';
+    if (n == -1) {
+        fprintf(stderr, "Error reading response from server. Please try again.\n");
+        close(fdDSTCP);
+        return;
+    }
+    sscanf(postBufferTemp, "%s %s", serverResponseCode, postMID);
+    if (!strcmp(postMID, "NOK")) {
+        fprintf(stderr, "Error posting to group. Please try again.\n");
+        close(fdDSTCP);
+        return;
+    }
+    printf("You have successfully posted in group %s with message ID %s.\n", activeGroup, postMID);
+    close(fdDSTCP);
+}
+
+char * readTCP() {
+    unsigned long len = 256; // arbitrary size
+    unsigned long bytesReceived = 0;
+    unsigned long curSize = 0;
+    int status = 0;
+    char * buf = NULL;
+    do {
+        if (bytesReceived >= curSize) {
+            char * temp;
+            curSize = curSize + len;
+            temp = (char *) realloc(buf, curSize);
+            if (temp != NULL) {
+                buf = temp;
+            } else {
+                fprintf(stderr, "Realloc in retrieve failed! Please try again.\n");
+                return NULL;
+            }
+        }
+        status = recv(fdDSTCP, buf + bytesReceived, len, 0);
+        if (status > 0) {
+            bytesReceived = bytesReceived + status;
+        } else if (status < 0) {
+            fprintf(stderr, "Recv in retrieve failed! Please try again.\n");
+        }
+    } while (status > 0);
+    return buf;
+}
+
+void retrieveMessage() {
+    char retrieveTempBuffer[9+1] = "";
+    char startingMessage[4+1] = "";
+    char numberOfMessages[4+1] = "";
+
+    char messageText[39] = ""; // 39 = max(1+4+1+5+1+3, 1+1+1+24+1+10) + 1
+    char messageID[5] = "";
+    char userMessageID[6] = "";
+    char textSize[4] = "";
+    char textData[241] = "";
+    char fileName[25] = "";
+    char numBytesFile[11] = "";
+    char messageAllText[256] = "";
+
+    char tempBuf1[5] = ""; // 5 = 1 + max(1, 4)
+    char tempBuf2[25] = ""; // 25 = 1 + max(24, 5)
+    char tempBuf3[11] = ""; // 11 = 1 + max(10, 3)
+
+    char * retrieveBuffer = NULL;
+    char * ptrAuxBuf = NULL;
+    char * ptrTemp = NULL;
+    char * fileData = NULL;
+
+    if (groupSelected == FALSE) {
+        fprintf(stderr, "Please select a group before executing this command.\n");
+        return;
+    }
+    if (startTCP() == FAILURE) { // Error message is already printed in startTCP
+        return;
+    }
+    strcpy(startingMessage, tokenList[0]); // There's only 1 token in this command - the starting message
+    if (strlen(startingMessage) != 4) { // All message ID's must have 4 digits
+        fprintf(stderr, "Invalid starting message. Please try again.\n");
+        close(fdDSTCP);
+        return;
+    }
+    sprintf(serverMessage, "RTV %s %s %s\n", activeUser, activeGroup, startingMessage);
+    n = write(fdDSTCP, serverMessage, strlen(serverMessage)); // Send our message to the server
+    if(n == -1) {
+        fprintf(stderr, "Error sending command to server. Please try again.\n");
+        close(fdDSTCP);
+        return;
+    }
+    n = read(fdDSTCP, retrieveTempBuffer, sizeof(retrieveTempBuffer)); // This will ONLY read code, status and N
+    if (n == -1) {
+        fprintf(stderr, "Error reading response from server. Please try again.\n");
+        close(fdDSTCP);
+        return;
+    }
+    retrieveTempBuffer[n] = '\0'; // Finish our string
+    sscanf(retrieveTempBuffer, "%s %s %s", serverResponseCode, serverResponseStatus, numberOfMessages);
+    if (!strcmp(serverResponseStatus, "NOK")) { // NOK case
+        fprintf(stderr, "Couldn't retrieve messages. Please check given starting message and try again.\n");
+        close(fdDSTCP);
+        return;
+    }
+    if (!strcmp(serverResponseStatus, "EOF")) { // EOF case
+        printf("There are no available messages to show in this group from the given starting message. Please try again later.\n");
+        close(fdDSTCP);
+        return;
+    }
+    retrieveBuffer = readTCP();
+    int numMessages = atoi(numberOfMessages);
+    printf("%d messages to display: (MID | UID | Tsize | text [| Fname | Fsize | Fdata]):\n", numMessages);
+    int i = 1;
+    ptrAuxBuf = retrieveBuffer;
+    while (sscanf(ptrAuxBuf, " %s %s %s", tempBuf1, tempBuf2, tempBuf3) > 0) {
+        if (i > 20) {
+            break;
+        }
+        memset(messageAllText, 0, sizeof(messageAllText));
+        if (strlen(tempBuf1) == 1 && tempBuf1[0] == '/') { // File case
+            memset(fileName, 0, sizeof(fileName));
+            memset(numBytesFile, 0, sizeof(numBytesFile));
+
+            strcpy(fileName, tempBuf2);
+            strcpy(numBytesFile, tempBuf3);
+            ptrAuxBuf = ptrAuxBuf + 1 + 1 + 1 + strlen(tempBuf2) + 1 + strlen(tempBuf3) + 1;
+            ptrTemp = (char *) malloc(atoi(numBytesFile) + 1);
+            if (ptrTemp == NULL) {
+                fprintf(stderr, "Error on retrieve malloc. Please try again later.\n");
+                close(fdDSTCP);
+                return;
+            }
+            fileData = ptrTemp;
+            memcpy(fileData, ptrAuxBuf, atoi(numBytesFile));
+            fileData[atoi(numBytesFile)] = '\0';
+            printf(" | Fname=%s | Fsize=%s | Fdata=%s\n", fileName, numBytesFile, fileData);
+            ptrAuxBuf = ptrAuxBuf + atoi(numBytesFile) + 1;
+            sscanf(ptrAuxBuf, "%[^\n]", messageAllText); // Check if there's anything in front of file
+            int lenMsg;
+            if ((lenMsg = strlen(messageAllText)) > 0) {
+                i++;
+                sscanf(ptrAuxBuf, " %s %s %s %[^\n]", messageID, userMessageID, textSize, textData);
+                printf("MID=%s | UID=%s | Tsize=%s | Text=%s", messageID, userMessageID, textSize, textData);
+                ptrAuxBuf = ptrAuxBuf + lenMsg + 1;
+            }
+            memset(fileData, 0, sizeof(fileData));
+            free(ptrTemp);
+        } else {
+            if (i != 1) printf("\n");
+            i++;
+            sscanf(ptrAuxBuf, " %s %s %s %[^\n]", messageID, userMessageID, textSize, textData);
+            printf("MID=%s | UID=%s | Tsize=%s | Text=%s", messageID, userMessageID, textSize, textData);
+            ptrAuxBuf = ptrAuxBuf + 1 + strlen(tempBuf1) + 1 + strlen(tempBuf2) + 1 + strlen(tempBuf3) + 1 + atoi(tempBuf3);
+        }
+        if (i == numMessages + 1 || i == 21) { // Last case
+            printf("\n");
+        }
+    }
+    free(retrieveBuffer);
 }
 
 int startTCP() {
