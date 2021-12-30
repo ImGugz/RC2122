@@ -7,6 +7,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <sys/stat.h>
+#include <ctype.h>
 
 #define DSIP_DEFAULT "127.0.0.1"
 #define DSPORT_DEFAULT "58011" // change afterwards to group 18
@@ -26,6 +27,7 @@
 #define MAX_COMMAND_CODE_SIZE 4
 #define MAX_COMMAND_STATUS_SIZE 6
 #define UID_SIZE 6
+#define MAX_UID_SIZE 5
 #define PASSWORD_SIZE 8
 #define GROUPID_SIZE 2
 #define MAX_GROUPNAME_SIZE 24
@@ -59,6 +61,8 @@ ssize_t n;
 socklen_t addrlen;
 struct addrinfo hintsDS, *resDSUDP, *resDSTCP;
 struct sockaddr_in addrDS;
+
+int countSpaces = 0;
 
 char ipDS[MAX_IP_SIZE] = DSIP_DEFAULT;
 char portDS[MAX_PORT_SIZE] = DSPORT_DEFAULT;
@@ -96,6 +100,17 @@ int startTCP();
 
 void interactUDPServer();
 void interactUDPServerGroups();
+
+int readSpace();
+int readStatus(char *);
+int readNumberMessages(int *);
+int readMID(int *);
+int readUID(int *);
+int readTSize(int *);
+int readText(int, char *);
+int readFName(char *);
+int readFSize(int *);
+int readData(int, char *);
 
 void registerServerFeedback();
 void unregisterServerFeedback();
@@ -702,27 +717,14 @@ char * readTCP() {
 }
 
 void retrieveMessage() {
-    char retrieveTempBuffer[9+1] = "";
+
+    char retrieveCode[4];
+    char status[4];
     char startingMessage[4+1] = "";
-    char numberOfMessages[4+1] = "";
+    char megaBuffer[999];
 
-    char messageText[39] = ""; // 39 = max(1+4+1+5+1+3, 1+1+1+24+1+10) + 1
-    char messageID[5] = "";
-    char userMessageID[6] = "";
-    char textSize[4] = "";
-    char textData[241] = "";
-    char fileName[25] = "";
-    char numBytesFile[11] = "";
-    char messageAllText[256] = "";
-
-    char tempBuf1[5] = ""; // 5 = 1 + max(1, 4)
-    char tempBuf2[25] = ""; // 25 = 1 + max(24, 5)
-    char tempBuf3[11] = ""; // 11 = 1 + max(10, 3)
-
-    char * retrieveBuffer = NULL;
-    char * ptrAuxBuf = NULL;
-    char * ptrTemp = NULL;
-    char * fileData = NULL;
+    memset(retrieveCode, 0, sizeof(retrieveCode));
+    memset(status, 0, sizeof(status));
 
     if (groupSelected == FALSE) {
         fprintf(stderr, "Please select a group before executing this command.\n");
@@ -744,75 +746,371 @@ void retrieveMessage() {
         close(fdDSTCP);
         return;
     }
-    n = read(fdDSTCP, retrieveTempBuffer, sizeof(retrieveTempBuffer)); // This will ONLY read code, status and N
+    n = read(fdDSTCP, retrieveCode, sizeof(retrieveCode)-1); // This will ONLY read code and status
+    printf("retrieveCode:%s\n", retrieveCode);
+
+    if(strcmp(retrieveCode, "RRT") != 0) {
+        fprintf(stderr, "Invalid code from server\n");
+        return;
+    }
     if (n == -1) {
         fprintf(stderr, "Error reading response from server. Please try again.\n");
         close(fdDSTCP);
         return;
     }
-    retrieveTempBuffer[n] = '\0'; // Finish our string
-    sscanf(retrieveTempBuffer, "%s %s %s", serverResponseCode, serverResponseStatus, numberOfMessages);
-    if (!strcmp(serverResponseStatus, "NOK")) { // NOK case
+    retrieveCode[sizeof(retrieveCode)-1] = '\0'; // Finish our string
+    sscanf(retrieveCode, "%s", serverResponseCode);
+
+/*     memset(megaBuffer, 0, sizeof(megaBuffer));
+    int n = recv(fdDSTCP, megaBuffer, 998, 0);
+    printf("%d\n", n);
+    printf("%s\n", megaBuffer); */
+
+    if (readSpace() == FAILURE) return;
+
+    if (readStatus(status) == FAILURE) return;
+
+    if (strcmp(status, "OK") != 0 && strcmp(status, "NOK") != 0 
+     && strcmp(status, "EOF") != 0) {
+        fprintf(stderr, "Invalid status from server\n");
+        return;
+    }
+    if (!strcmp(status, "NOK")) { // NOK case
         fprintf(stderr, "Couldn't retrieve messages. Please check given starting message and try again.\n");
         close(fdDSTCP);
         return;
-    }
-    if (!strcmp(serverResponseStatus, "EOF")) { // EOF case
+    } 
+    if (!strcmp(status, "EOF")) { // EOF case
         printf("There are no available messages to show in this group from the given starting message. Please try again later.\n");
         close(fdDSTCP);
         return;
     }
-    retrieveBuffer = readTCP();
-    int numMessages = atoi(numberOfMessages);
-    printf("%d messages to display: (MID | UID | Tsize | text [| Fname | Fsize | Fdata]):\n", numMessages);
-    int i = 1;
-    ptrAuxBuf = retrieveBuffer;
-    while (sscanf(ptrAuxBuf, " %s %s %s", tempBuf1, tempBuf2, tempBuf3) > 0) {
-        if (i > 20) {
-            break;
-        }
-        memset(messageAllText, 0, sizeof(messageAllText));
-        if (strlen(tempBuf1) == 1 && tempBuf1[0] == '/') { // File case
-            memset(fileName, 0, sizeof(fileName));
-            memset(numBytesFile, 0, sizeof(numBytesFile));
 
-            strcpy(fileName, tempBuf2);
-            strcpy(numBytesFile, tempBuf3);
-            ptrAuxBuf = ptrAuxBuf + 1 + 1 + 1 + strlen(tempBuf2) + 1 + strlen(tempBuf3) + 1;
-            ptrTemp = (char *) malloc(atoi(numBytesFile) + 1);
-            if (ptrTemp == NULL) {
-                fprintf(stderr, "Error on retrieve malloc. Please try again later.\n");
-                close(fdDSTCP);
-                return;
-            }
-            fileData = ptrTemp;
-            memcpy(fileData, ptrAuxBuf, atoi(numBytesFile));
-            fileData[atoi(numBytesFile)] = '\0';
-            printf(" | Fname=%s | Fsize=%s | Fdata=%s\n", fileName, numBytesFile, fileData);
-            ptrAuxBuf = ptrAuxBuf + atoi(numBytesFile) + 1;
-            sscanf(ptrAuxBuf, "%[^\n]", messageAllText); // Check if there's anything in front of file
-            int lenMsg;
-            if ((lenMsg = strlen(messageAllText)) > 0) {
-                i++;
-                sscanf(ptrAuxBuf, " %s %s %s %[^\n]", messageID, userMessageID, textSize, textData);
-                printf("MID=%s | UID=%s | Tsize=%s | Text=%s", messageID, userMessageID, textSize, textData);
-                ptrAuxBuf = ptrAuxBuf + lenMsg + 1;
-            }
-            memset(fileData, 0, sizeof(fileData));
-            free(ptrTemp);
-        } else {
-            if (i != 1) printf("\n");
-            i++;
-            sscanf(ptrAuxBuf, " %s %s %s %[^\n]", messageID, userMessageID, textSize, textData);
-            printf("MID=%s | UID=%s | Tsize=%s | Text=%s", messageID, userMessageID, textSize, textData);
-            ptrAuxBuf = ptrAuxBuf + 1 + strlen(tempBuf1) + 1 + strlen(tempBuf2) + 1 + strlen(tempBuf3) + 1 + atoi(tempBuf3);
+    if (readSpace() == FAILURE) return;
+
+    int numMessages;
+    if(readNumberMessages(&numMessages) == FAILURE) return;
+
+    printf("%d messages to display: (MID | UID | Tsize | text [| Fname | Fsize | Fdata]):\n", numMessages);
+
+    int check = 1;
+    for (int c = 0; c < numMessages; c++) {
+
+        int MID, UID, TSize;
+        char testForSlash[2];
+        memset(testForSlash, 0, sizeof(testForSlash));
+        if (check){ // only one space when the previous post didnt have a file
+            if (readSpace() == FAILURE) return;
         }
-        if (i == numMessages + 1 || i == 21) { // Last case
-            printf("\n");
+        check = 1;
+        if (readMID(&MID) == FAILURE) return;  
+        if (readSpace() == FAILURE) return;
+        if (readUID(&UID) == FAILURE) return;
+        if (readSpace() == FAILURE) return;
+        if (readTSize(&TSize) == FAILURE) return;
+        if (readSpace() == FAILURE) return;
+
+        char * text = malloc(sizeof(char)*(TSize+1));
+        if (readText(TSize, text) == FAILURE) {free(text); return;}
+        if (readSpace() == FAILURE) {free(text); return;} 
+
+        if (recv(fdDSTCP, testForSlash, 1, MSG_PEEK) == -1) {
+            free(text);
+            fprintf(stderr, "Error reading from server\n");
+            return;
+        }
+
+        if (strcmp(testForSlash, "/") != 0) {
+            check = 0;
+            printf("Message number %d: MID=%d UID=%d TextSize=%d Text=%s\n", c, MID, UID, TSize, text);
+            free(text);
+            continue;
+        }
+        
+        printf("Message number %d: MID=%d UID=%d TextSize=%d Text=%s ", c, MID, UID, TSize, text);
+        free(text);
+
+        if (recv(fdDSTCP, testForSlash, 1, 0) == -1) {
+            fprintf(stderr, "Error reading from server\n");
+            return;
+        } //delete slash
+
+        int FSize;
+        if (readSpace() == FAILURE) return;
+
+        char * fileName = malloc(sizeof(char)*(MAX_FILENAME_SIZE+1));
+        if (readFName(fileName) == FAILURE) {free(fileName); return;} 
+        if (readSpace() == FAILURE) {free(fileName); return;}
+        if (readFSize(&FSize) == FAILURE) {free(fileName); return;}
+        if (readSpace() == FAILURE) {free(fileName); return;}
+
+        printf("/ filename=%s fileSize=%d\n", fileName, FSize);
+        if (readData(FSize, fileName) == FAILURE) {free(fileName); return;}
+        free(fileName);
+
+    }
+    //RRT status [N[ MID UID Tsize text [/ Fname Fsize data]]*]   format       
+}
+
+int readSpace() {
+    char spaceBuffer[2];
+    memset(spaceBuffer, 0, sizeof(spaceBuffer));
+    n = recv(fdDSTCP, spaceBuffer, 1, 0);
+    countSpaces++;
+    if (spaceBuffer[0] == ' ') return SUCCESS;
+    else {
+        fprintf(stderr, "Invalid message format from server.%d\n", countSpaces);
+        printf("%c\n", spaceBuffer[0]);
+        return FAILURE;
+    }
+}
+
+int readStatus(char * status) {
+    int c = 0, aux = 0;
+    char trash[2];
+    for (; c < 3 && aux == 0; c++) {
+        recv(fdDSTCP, status+c, 1, MSG_PEEK);
+        if (isalpha(status[c]))
+            recv(fdDSTCP, trash, 1, 0);
+        else if (status[c] == ' '){
+            aux = 1;
+            c--;
+        } else {
+            fprintf(stderr, "Invalid status from server\n");
+            return FAILURE;
         }
     }
-    free(retrieveBuffer);
+    status[c]='\0';
+    return SUCCESS;
 }
+
+int readNumberMessages(int * numMessages) {
+    int num = 0;
+    char numberBuffer[3], tempBuffer[2];
+    recv(fdDSTCP, numberBuffer, 1, 0);
+    switch(numberBuffer[0]) {
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
+        case '0':
+            break;
+        default:
+            return FAILURE;
+    }
+    recv(fdDSTCP, tempBuffer, 1, MSG_PEEK);
+    switch(tempBuffer[0]) {
+        case ' ':
+            numberBuffer[1] = '\0';
+            *numMessages = atoi(numberBuffer);
+            return SUCCESS;
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
+        case '0':
+            numberBuffer[1] = tempBuffer[0];
+            numberBuffer[2] = '\0';
+            *numMessages = atoi(numberBuffer);
+            recv(fdDSTCP, tempBuffer, 1, 0);
+            return SUCCESS;
+        default:
+            return FAILURE;
+    }
+}
+
+int readMID(int * MID) {
+    char tempMIDBuffer[MSGID_SIZE+1];
+    recv(fdDSTCP, tempMIDBuffer, MSGID_SIZE, 0);
+    for (int c = 0; c < MSGID_SIZE; c++) {
+        switch (tempMIDBuffer[c]) {
+        case '0':
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
+            break;
+        default:
+            fprintf(stderr, "Invalid message format from server(invalid MID)\n");
+            return FAILURE;
+        }
+    }
+    tempMIDBuffer[MSGID_SIZE] = '\0';
+    *MID = atoi(tempMIDBuffer);
+    return SUCCESS;
+}
+
+int readUID(int * UID) {
+    char tempUIDBuffer[MAX_UID_SIZE+1];
+    recv(fdDSTCP, tempUIDBuffer, MAX_UID_SIZE, 0);
+    for (int c = 0; c < MAX_UID_SIZE; c++) {
+        switch (tempUIDBuffer[c]) {
+        case '0':
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
+            break;
+        default:
+            fprintf(stderr, "Invalid message format from server(invalid UID)\n");
+            return FAILURE;
+        }
+    }
+    tempUIDBuffer[MAX_UID_SIZE] = '\0';
+    *UID = atoi(tempUIDBuffer);
+    return SUCCESS;
+}
+
+int readTSize(int * TSize) {
+    char tempTSizeBuffer[3+1];
+    char temp[2];
+    int c = 0, aux = 0;
+    for (; c < 3 && aux == 0; c++) {
+        recv(fdDSTCP, tempTSizeBuffer+c, 1, MSG_PEEK);
+        switch (tempTSizeBuffer[c]) {
+            case '0':
+            case '1':
+            case '2':
+            case '3':
+            case '4':
+            case '5':
+            case '6':
+            case '7':
+            case '8':
+            case '9':
+                recv(fdDSTCP, temp, 1, 0);
+                break;
+            case ' ':
+                aux = 1;
+                c--;
+                break;
+            default:
+                fprintf(stderr, "Invalid message format from server(invalid text size)\n");
+                return FAILURE;
+        }
+    }
+    tempTSizeBuffer[c] = '\0';
+    *TSize = atoi(tempTSizeBuffer);
+    return SUCCESS;
+}
+
+int readText(int TSize, char * text) {
+    if (recv(fdDSTCP, text, TSize, 0) == -1) {
+        fprintf(stderr, "Invalid message from server. Text not the correct size\n");
+        return FAILURE;
+    }
+    text[TSize] = '\0';
+    return SUCCESS;
+}
+
+int readFName(char * filename) {
+    char temp[2];
+    int c = 0, aux = 0, cpy = 0;
+    for (; c < MAX_FILENAME_SIZE && aux == 0; c++) {
+        recv(fdDSTCP, filename+c, 1, MSG_PEEK);
+        if (isalnum(filename[c]) || filename[c] == '-' ||
+        filename[c] == '_' || filename[c] == '.') {
+            recv(fdDSTCP, temp, 1, 0);
+        }
+        else if (filename[c] == ' '){
+            aux = 1;
+            c--;
+        } else {
+            fprintf(stderr, "Inside for filename:%s\n", filename);
+            fprintf(stderr, "Invalid message format from server(invalid file name)\n");
+            return FAILURE;
+        }
+    }
+    if (filename[c-4] != '.' || !isalpha(filename[c-3]) ||
+    !isalpha(filename[c-2]) || !isalpha(filename[c-1])) {
+        fprintf(stderr, "filename[c-4]:%c\n", filename[c-4]);
+        fprintf(stderr, "filename[c-3]:%c\n", filename[c-3]);
+        fprintf(stderr, "filename[c-2]:%c\n", filename[c-2]);
+        fprintf(stderr, "filename[c-1]:%c\n", filename[c-1]);
+        fprintf(stderr, "Outside for filename:%s\n", filename);
+        fprintf(stderr, "Invalid message format from server(invalid file name)\n");
+        return FAILURE;
+    }
+
+    filename[c] = '\0';
+    return SUCCESS;
+}
+
+int readFSize(int * FSize) {
+    char tempFSizeBuffer[10+1];
+    char temp[2];
+    int c = 0, aux = 0;
+    for (; c < 10 && aux == 0; c++) {
+        recv(fdDSTCP, tempFSizeBuffer+c, 1, MSG_PEEK);
+        switch (tempFSizeBuffer[c]) {
+            case '0':
+            case '1':
+            case '2':
+            case '3':
+            case '4':
+            case '5':
+            case '6':
+            case '7':
+            case '8':
+            case '9':
+                recv(fdDSTCP, temp, 1, 0);
+                break;
+            case ' ':
+                aux = 1;
+                c--;
+                break;
+            default:
+                fprintf(stderr, "Invalid message format from server(invalid file size)\n");
+                return FAILURE;
+        }
+    }
+    tempFSizeBuffer[c] = '\0';
+    *FSize = atoi(tempFSizeBuffer);
+    return SUCCESS;
+}
+
+int readData(int FSize, char * filename) {
+    FILE * fp;
+    char tempData[1000];
+    int n, total = 0;
+    fp = fopen(filename, "wb");
+    while (total < FSize) {
+        memset(tempData, 0, sizeof(tempData));
+        int min = (sizeof(tempData)-1 < FSize - total) ? sizeof(tempData)-1 : FSize - total;
+        if ((n = recv(fdDSTCP, (void *) tempData, min, 0)) == -1) {
+            fprintf(stderr, "Error reading file from server.\n");
+            fclose(fp);
+            return FAILURE;
+        }
+        fputs(tempData, fp);
+        total += n;
+    }
+    printf("size saved from file:%d\n", total);
+    /* fprintf(fp, "%s", data); */
+    fclose(fp);
+    return SUCCESS;
+}
+
 
 int startTCP() {
     // Establish TCP connection as well
