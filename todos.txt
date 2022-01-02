@@ -1,4 +1,0 @@
-- Verificar comportamento de abortar (devemos continuar ou dar exit em que circunstâncias);
-- Mudar default port depois para 58018
-- O que fazer se o utilizador der unsubscribe de algo que não está subscrito? O servidor devolve RGU OK...
-- Caso de 0 grupos no udpInteractGroups

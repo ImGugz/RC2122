@@ -1,6 +1,13 @@
 {
   "C_Cpp.errorSquiggles": "Disabled",
   "files.associations": {
-    "vector": "cpp"
+    "vector": "cpp",
+    "errno.h": "c",
+    "netdb.h": "c",
+    "tcpandudp.h": "c",
+    "udpandtcp.h": "c",
+    "execute-commands.h": "c",
+    "auxfunctions.h": "c",
+    "types.h": "c"
   }
 }
