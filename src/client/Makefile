@@ -10,7 +10,7 @@ all: user
 user: udpandtcp.o auxfunctions.o execute-commands.o commands.o main.o
 	$(CC) $(CFLAGS) -o user udpandtcp.o auxfunctions.o execute-commands.o commands.o main.o
 
-main.o: main.c 
+main.o: main.c execute-commands.h auxfunctions.h
 	$(CC) $(CFLAGS) -o main.o -c main.c
 
 commands.o: commands.c commands.h execute-commands.h auxfunctions.h
