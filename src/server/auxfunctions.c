@@ -1,5 +1,13 @@
 #include "auxfunctions.h"
 
+int validPort(char * portStr) {
+    if (isNumber(portStr)) {
+        int port = atoi(portStr);
+        if (0 <= port && port <= 65535) return 1;
+    }
+    return 0;
+}
+
 /**
  * @brief Reads user executable arguments and parses them.
  * 
@@ -19,9 +27,7 @@ void parseArgs(int argc, char * argv[]) {
                     fprintf(stderr, "[-] Usage: ./DS [-p DSport] [-v].\n");
                     exit(EXIT_FAILURE);
                 }
-                if (isNumber(optarg)) {
-                    strcpy(portDS, optarg);
-                }
+                if (validPort(optarg)) strcpy(portDS, optarg);
                 break;
             case 'v':
                 verbose = 1;
@@ -54,4 +60,17 @@ int isNumber(char * num) {
         }
     }
     return 1;
+}
+
+int timerOn(int fd) {
+    struct timeval timeout;
+    memset((char *) &timeout, 0, sizeof(timeout));
+    timeout.tv_sec = DEFAULT_TIMEOUT;
+    return setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *) &timeout, sizeof(struct timeval));
+}
+
+int timerOff(int fd) {
+    struct timeval timeout;
+    memset((char *) &timeout, 0, sizeof(timeout));
+    return setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *) &timeout, sizeof(struct timeval));
 }
