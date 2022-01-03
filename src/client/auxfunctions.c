@@ -37,7 +37,11 @@ void parseArgs(int argc, char * argv[]) {
                     fprintf(stderr, "[-] Missing argument (p). Please try again.\n");
                     exit(EXIT_FAILURE);
                 }
-                if (isNumber(optarg)) strcpy(portDS, optarg);
+                if (!isNumber(optarg)) {
+                    fprintf(stderr, "[-] Invalid port number. Please try again.\n");
+                    exit(EXIT_FAILURE);
+                } 
+                strcpy(portDS, optarg);
                 break;
             case ':':
                 fprintf(stderr, "[-] Missing argument. Please try again.\n");

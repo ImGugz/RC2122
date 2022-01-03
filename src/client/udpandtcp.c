@@ -232,8 +232,8 @@ void setAddrPortDS(char * addr, char * port) {
         fprintf(stderr, "[-] Please insert a valid domain name/port.\n");
         return;
     }
-    if (addr != NULL) strcpy(addrDS, addr);
-    if (port != NULL) strcpy(portDS, port);
+    strcpy(addrDS, addr);
+    strcpy(portDS, port);
 }
 
 /**
@@ -243,7 +243,7 @@ void setAddrPortDS(char * addr, char * port) {
 void createUDPSocket() {
     fdDSUDP = socket(AF_INET, SOCK_DGRAM, 0);
     if (fdDSUDP == -1) {
-        perror("[-] UDP socket failed to create");
+        perror("[-] Client UDP socket failed to create");
         exit(EXIT_FAILURE);
     }
     memset(&hintsUDP, 0, sizeof(hintsUDP));
@@ -264,7 +264,7 @@ void createUDPSocket() {
 void connectTCPSocket() {
     fdDSTCP = socket(AF_INET, SOCK_STREAM, 0);
     if (fdDSTCP == -1) {
-        perror("[-] TCP socket failed to create");
+        perror("[-] Client TCP socket failed to create");
         closeUDPSocket();
         exit(EXIT_FAILURE);
     }
