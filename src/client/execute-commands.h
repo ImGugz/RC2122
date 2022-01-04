@@ -2,7 +2,7 @@
  * @file execute-commands.h
  * @author Group 18
  * @brief Header file containing all commands execution function prototypes.
- * 
+ *
  */
 
 #ifndef EXECUTECOMMANDS_H
@@ -19,20 +19,20 @@
 extern int userSession;
 
 // Commands
-void userRegister(char ** tokenList, int numTokens);
-void userUnregister(char ** tokenList, int numTokens);
-void userLogin(char ** tokenList, int numTokens);
-void userLogout(char ** tokenList, int numTokens);
+void userRegister(char **tokenList, int numTokens);
+void userUnregister(char **tokenList, int numTokens);
+void userLogin(char **tokenList, int numTokens);
+void userLogout(char **tokenList, int numTokens);
 void showActiveUser(int numTokens);
 void userExit(int numTokens);
 void showGroups(int numTokens);
-void userGroupSubscribe(char ** tokenList, int numTokens);
-void userGroupUnsubscribe(char ** tokenList, int numTokens);
+void userGroupSubscribe(char **tokenList, int numTokens);
+void userGroupUnsubscribe(char **tokenList, int numTokens);
 void userGroupsList(int numTokens);
-void userSelectGroup(char ** tokenList, int numTokens);
+void userSelectGroup(char **tokenList, int numTokens);
 void showSelectedGroup(int numTokens);
 void showUsersGroup(int numTokens);
-void userPostGroup(char * command);
-void userRetrieveMsgs(char ** tokenList, int numTokens);
+void userPostGroup(char *command);
+void userRetrieveMsgs(char **tokenList, int numTokens);
 
 #endif

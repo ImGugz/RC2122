@@ -2,18 +2,21 @@
  * @file auxfunctions.c
  * @author Group 18
  * @brief Contains all auxiliary functions used throughout multiple .c files.
- * 
+ *
  */
 
 #include "auxfunctions.h"
 
-#define MAX_GROUPS 100 // It's actually 99 but we'll round it
+#define MAX_GROUPS 100                      // It's actually 99 but we'll round it
 #define MIN(x, y) (((x) < (y)) ? (x) : (y)) // Macro to determine min(x, y)
 
-int validPort(char * portStr) {
-    if (isNumber(portStr)) {
+int validPort(char *portStr)
+{
+    if (isNumber(portStr))
+    {
         int portNum = atoi(portStr);
-        if (0 <= portNum && portNum <= 65535) {
+        if (0 <= portNum && portNum <= 65535)
+        {
             return 1;
         }
     }
@@ -22,46 +25,53 @@ int validPort(char * portStr) {
 
 /**
  * @brief Reads user executable arguments and parses them.
- * 
+ *
  * @param argc Number of user executable arguments
  * @param argv User executable arguments
  */
-void parseArgs(int argc, char * argv[]) {
+void parseArgs(int argc, char *argv[])
+{
     char addrDS[ADDR_SIZE] = DEFAULT_DSADDR, portDS[PORT_SIZE] = DEFAULT_DSPORT;
     char c;
-    if (argc != 1 && argc != 3 && argc != 5) {
+    if (argc != 1 && argc != 3 && argc != 5)
+    {
         fprintf(stderr, "[-] Invalid input. Please try again.\n");
         exit(EXIT_FAILURE);
     }
-    while ((c = getopt(argc, argv, ":n:p:")) != -1) {
-        switch(c) {
-            case 'n':
-                if (strcmp(optarg, "-p") == 0) { // corner case (./user -n -p 58011)
-                    fprintf(stderr, "[-] Missing argument (n). Usage: ./user [-n DSIP] [-p DSport].\n");
-                    exit(EXIT_FAILURE);
-                }
-                strcpy(addrDS, optarg);
-                break;
-            case 'p':
-                if (strcmp(optarg, "-n") == 0) { // corner case (./user -p -n)
-                    fprintf(stderr, "[-] Missing argument (p). Usage: ./user [-n DSIP] [-p DSport].\n");
-                    exit(EXIT_FAILURE);
-                }
-                if (!validPort(optarg)) {
-                    fprintf(stderr, "[-] Invalid port number. Please try again.\n");
-                    exit(EXIT_FAILURE);
-                } 
-                strcpy(portDS, optarg);
-                break;
-            case ':':
-                fprintf(stderr, "[-] Usage: ./user [-n DSIP] [-p DSport]. Please try again.\n");
+    while ((c = getopt(argc, argv, ":n:p:")) != -1)
+    {
+        switch (c)
+        {
+        case 'n':
+            if (strcmp(optarg, "-p") == 0)
+            { // corner case (./user -n -p 58011)
+                fprintf(stderr, "[-] Missing argument (n). Usage: ./user [-n DSIP] [-p DSport].\n");
                 exit(EXIT_FAILURE);
-            case '?':
-                fprintf(stderr, "[-] Usage: ./user [-n DSIP] [-p DSport]. Please try again.\n");
+            }
+            strcpy(addrDS, optarg);
+            break;
+        case 'p':
+            if (strcmp(optarg, "-n") == 0)
+            { // corner case (./user -p -n)
+                fprintf(stderr, "[-] Missing argument (p). Usage: ./user [-n DSIP] [-p DSport].\n");
                 exit(EXIT_FAILURE);
-            default:
-                fprintf(stderr, "[-] Usage: ./user [-n DSIP] [-p DSport]. Please try again.\n");
+            }
+            if (!validPort(optarg))
+            {
+                fprintf(stderr, "[-] Invalid port number. Please try again.\n");
                 exit(EXIT_FAILURE);
+            }
+            strcpy(portDS, optarg);
+            break;
+        case ':':
+            fprintf(stderr, "[-] Usage: ./user [-n DSIP] [-p DSport]. Please try again.\n");
+            exit(EXIT_FAILURE);
+        case '?':
+            fprintf(stderr, "[-] Usage: ./user [-n DSIP] [-p DSport]. Please try again.\n");
+            exit(EXIT_FAILURE);
+        default:
+            fprintf(stderr, "[-] Usage: ./user [-n DSIP] [-p DSport]. Please try again.\n");
+            exit(EXIT_FAILURE);
         }
     }
     setAddrPortDS(addrDS, portDS);
@@ -70,14 +80,17 @@ void parseArgs(int argc, char * argv[]) {
 
 /**
  * @brief Checks if a given string is a number.
- * 
+ *
  * @param num string containing (or not) a number
  * @return 0 if it's not a number and 1 otherwise
  */
-int isNumber(char * num) {
+int isNumber(char *num)
+{
     size_t len = strlen(num);
-    for (int i = 0; i < len; ++i) {
-        if (num[i] < '0' || num[i] > '9') {
+    for (int i = 0; i < len; ++i)
+    {
+        if (num[i] < '0' || num[i] > '9')
+        {
             return 0;
         }
     }
@@ -86,58 +99,80 @@ int isNumber(char * num) {
 
 /**
  * @brief Prints groups from gl and ulist commands.
- * 
+ *
  * @param buffer DS protocol response to gl and ulist commands
  * @param numGroups Number of groups to print out
  */
-void printGroups(char * buffer, int numGroups) {
-    char * groupsBuffer, * token;
-    char * groupsList[3 * MAX_GROUPS]; // 3 tokens per group (GID, GName, MID)
+void printGroups(char *buffer, int numGroups)
+{
+    char *groupsBuffer, *token;
+    char *groupsList[3 * MAX_GROUPS]; // 3 tokens per group (GID, GName, MID)
     int cnt = 0;
-    if (numGroups == 0) {
+    if (numGroups == 0)
+    {
         printf("[+] There are no available groups.\n");
         return;
     }
     printf("[+] %d groups: (GID | GName | Last MID)\n", numGroups);
     groupsBuffer = (numGroups >= 10) ? buffer + 7 : buffer + 6;
     token = strtok(groupsBuffer, " ");
-    while (token != NULL) {
+    while (token != NULL)
+    {
         groupsList[cnt++] = token;
         token = strtok(NULL, " \n");
     }
-    for (int i = 0; i <= cnt-3; i += 3) {
-        if ((strlen(groupsList[i]) != 2) || (strlen(groupsList[i+1]) > 24) || (strlen(groupsList[i+2]) != 4)) {
+    for (int i = 0; i <= cnt - 3; i += 3)
+    {
+        if ((strlen(groupsList[i]) != 2) || (strlen(groupsList[i + 1]) > 24) || (strlen(groupsList[i + 2]) != 4))
+        {
             printf("[-] Incorrect groups list protocol message was received. Program will now exit.\n");
             closeUDPSocket();
             exit(EXIT_FAILURE);
         }
-        printf("%s %s %s\n", groupsList[i], groupsList[i+1], groupsList[i+2]);
+        printf("%s %s %s\n", groupsList[i], groupsList[i + 1], groupsList[i + 2]);
     }
 }
 
 /**
  * @brief Reads the given command and parses it to a macro.
- * 
+ *
  * @param command string containing user command
- * @return macro corresponding to given command 
+ * @return macro corresponding to given command
  */
-int parseUserCommand(char * command) {
-    if (strcmp(command, "reg") == 0) return REGISTER;
-    else if ((strcmp(command, "unregister") == 0) || (strcmp(command, "unr") == 0)) return UNREGISTER;
-    else if (strcmp(command, "login") == 0) return LOGIN;
-    else if (strcmp(command, "logout") == 0) return LOGOUT;
-    else if ((strcmp(command, "showuid") == 0) || (strcmp(command, "su") == 0)) return SHOW_USER; // Opcional 2
-    else if (strcmp(command, "exit") == 0) return USER_EXIT;
-    else if ((strcmp(command, "groups") == 0) || (strcmp(command, "gl") == 0)) return GROUPS_LIST;
-    else if (strcmp(command, "subscribe") == 0 || strcmp(command, "s") == 0) return SUBSCRIBE;
-    else if (strcmp(command, "unsubscribe") == 0 || strcmp(command, "u") == 0) return UNSUBSCRIBE;
-    else if ((strcmp(command, "my_groups") == 0) || (strcmp(command, "mgl") == 0)) return USER_GROUPS;
-    else if ((strcmp(command, "select") == 0) || (strcmp(command, "sag") == 0)) return SELECT;
-    else if ((strcmp(command, "ulist") == 0) || (strcmp(command, "ul") == 0)) return USERS_LIST;
-    else if (strcmp(command, "post") == 0) return GROUP_POST;
-    else if ((strcmp(command, "retrieve") == 0) || (strcmp(command, "r") == 0)) return GROUP_RETRIEVE;
-    else if ((strcmp(command, "showgid") == 0) || (strcmp(command, "sg") == 0)) return SHOW_SELECTED; // Opcional 1
-    else {
+int parseUserCommand(char *command)
+{
+    if (strcmp(command, "reg") == 0)
+        return REGISTER;
+    else if ((strcmp(command, "unregister") == 0) || (strcmp(command, "unr") == 0))
+        return UNREGISTER;
+    else if (strcmp(command, "login") == 0)
+        return LOGIN;
+    else if (strcmp(command, "logout") == 0)
+        return LOGOUT;
+    else if ((strcmp(command, "showuid") == 0) || (strcmp(command, "su") == 0))
+        return SHOW_USER; // Opcional 2
+    else if (strcmp(command, "exit") == 0)
+        return USER_EXIT;
+    else if ((strcmp(command, "groups") == 0) || (strcmp(command, "gl") == 0))
+        return GROUPS_LIST;
+    else if (strcmp(command, "subscribe") == 0 || strcmp(command, "s") == 0)
+        return SUBSCRIBE;
+    else if (strcmp(command, "unsubscribe") == 0 || strcmp(command, "u") == 0)
+        return UNSUBSCRIBE;
+    else if ((strcmp(command, "my_groups") == 0) || (strcmp(command, "mgl") == 0))
+        return USER_GROUPS;
+    else if ((strcmp(command, "select") == 0) || (strcmp(command, "sag") == 0))
+        return SELECT;
+    else if ((strcmp(command, "ulist") == 0) || (strcmp(command, "ul") == 0))
+        return USERS_LIST;
+    else if (strcmp(command, "post") == 0)
+        return GROUP_POST;
+    else if ((strcmp(command, "retrieve") == 0) || (strcmp(command, "r") == 0))
+        return GROUP_RETRIEVE;
+    else if ((strcmp(command, "showgid") == 0) || (strcmp(command, "sg") == 0))
+        return SHOW_SELECTED; // Opcional 1
+    else
+    {
         fprintf(stderr, "[-] Invalid user command code. Please try again.\n");
         return INVALID_COMMAND;
     }
@@ -145,20 +180,23 @@ int parseUserCommand(char * command) {
 
 /**
  * @brief Checks if a given buffer specifies a given pattern.
- * 
+ *
  * @param buf buffer to be checked
  * @param reg pattern that buffer is being checked on
  * @return 1 if buffer specifies the given pattern and 0 otherwise
  */
-int validRegex(char * buf, char * reg) {
+int validRegex(char *buf, char *reg)
+{
     int reti;
     regex_t regex;
     reti = regcomp(&regex, reg, REG_EXTENDED);
-    if (reti) {
+    if (reti)
+    {
         fprintf(stderr, "[-] Internal error on parsing regex. Please try again later and/or contact the developers.\n");
         return 0;
     }
-    if (regexec(&regex, buf, (size_t) 0 , NULL, 0)) {
+    if (regexec(&regex, buf, (size_t)0, NULL, 0))
+    {
         regfree(&regex);
         return 0;
     }
@@ -168,17 +206,20 @@ int validRegex(char * buf, char * reg) {
 
 /**
  * @brief Auxiliary function of sendFile that sends a buffer via TCP connection
- * 
+ *
  * @param buffer buffer to be sent
  * @param num number of bytes to be sent
  * @return 1 if num bytes of buffer were sent and 0 otherwise
  */
-int sendData(char * buffer, size_t num) {
-    unsigned char * tmpBuf = (unsigned char *) buffer;
+int sendData(char *buffer, size_t num)
+{
+    unsigned char *tmpBuf = (unsigned char *)buffer;
     ssize_t n;
-    while (num > 0) {
+    while (num > 0)
+    {
         n = send(fdDSTCP, tmpBuf, num, 0);
-        if (n == -1) {
+        if (n == -1)
+        {
             perror("[-] Failed to send file data via TCP");
             return 0;
         }
@@ -190,24 +231,28 @@ int sendData(char * buffer, size_t num) {
 
 /**
  * @brief Sends a file via TCP.
- * 
+ *
  * @param post file stream of the file being sent
  * @param lenFile number of bytes in file being sent
  * @return 1 if file was sent and 0 otherwise
  */
-int sendFile(FILE * post, long lenFile) {
+int sendFile(FILE *post, long lenFile)
+{
     char buffer[1024];
-    do {
+    do
+    {
         size_t num = MIN(lenFile, sizeof(buffer));
         num = fread(buffer, sizeof(char), num, post);
-        if (num < 1) {
+        if (num < 1)
+        {
             fprintf(stderr, "[-] Failed on reading the given file. Please try again.\n");
             closeUDPSocket();
             closeTCPSocket();
             fclose(post);
             return 0;
         }
-        if (!sendData(buffer, num)) {
+        if (!sendData(buffer, num))
+        {
             closeUDPSocket();
             closeTCPSocket();
             fclose(post);
@@ -220,16 +265,19 @@ int sendFile(FILE * post, long lenFile) {
 
 /**
  * @brief Sends a message via TCP.
- * 
+ *
  * @param message message to be sent
  */
-void sendTCP(char * message) {
+void sendTCP(char *message)
+{
     int bytesSent = 0;
     ssize_t nSent;
     size_t tempLen = strlen(message);
-    while (bytesSent < tempLen) { // Send initial message
+    while (bytesSent < tempLen)
+    { // Send initial message
         nSent = send(fdDSTCP, message + bytesSent, tempLen - bytesSent, 0);
-        if (nSent == -1) {
+        if (nSent == -1)
+        {
             perror("[-] Failed to write on TCP");
             closeUDPSocket();
             closeTCPSocket();
@@ -241,33 +289,39 @@ void sendTCP(char * message) {
 
 /**
  * @brief Reads at most maxSize bytes of given message with a given flag
- * 
+ *
  * @param message buffer to store message read
  * @param maxSize max number of bytes to be read
  * @param flag 0 or MSG_PEEK
  * @return -1 if recv failed or N > 0 corresponding to the number of bytes received
  */
-int readTCP(char * message, int maxSize, int flag) {
+int readTCP(char *message, int maxSize, int flag)
+{
     int bytesRecv = 0;
     ssize_t n;
-    if (flag == MSG_PEEK) { // We assume that recv can get all maxSize bytes (usually low)
+    if (flag == MSG_PEEK)
+    { // We assume that recv can get all maxSize bytes (usually low)
         n = recv(fdDSTCP, message, maxSize, MSG_PEEK);
-        if (n == -1) {
+        if (n == -1)
+        {
             perror("[-] Failed to receive from server on TCP");
             closeUDPSocket();
             closeTCPSocket();
         }
         return n;
     }
-    while (bytesRecv < maxSize) {
+    while (bytesRecv < maxSize)
+    {
         n = recv(fdDSTCP, message + bytesRecv, maxSize - bytesRecv, 0);
-        if (n == -1) {
+        if (n == -1)
+        {
             perror("[-] Failed to receive from server on TCP");
             closeUDPSocket();
             closeTCPSocket();
             return n;
         }
-        if (n == 0) break; // Peer has performed an orderly shutdown -> message complete
+        if (n == 0)
+            break; // Peer has performed an orderly shutdown -> message complete
         bytesRecv += n;
     }
     return bytesRecv;
@@ -275,32 +329,37 @@ int readTCP(char * message, int maxSize, int flag) {
 
 /**
  * @brief Receives a file via TCP.
- * 
+ *
  * @param fileName name of the file being received
  * @param lenFile number of bytes in the file being received
  */
-void recvFile(char * fileName, long lenFile) {
+void recvFile(char *fileName, long lenFile)
+{
     long bytesRecv = 0;
     int toRead;
     unsigned char bufFile[2048] = "";
     ssize_t n;
-    FILE * retFile = fopen(fileName, "wb");
-    if (!retFile) {
+    FILE *retFile = fopen(fileName, "wb");
+    if (!retFile)
+    {
         perror("Failed to create retrieved file");
         closeUDPSocket();
         closeTCPSocket();
         exit(EXIT_FAILURE);
     }
-    do {
+    do
+    {
         toRead = MIN(sizeof(bufFile), lenFile - bytesRecv);
         n = recv(fdDSTCP, bufFile, toRead, 0);
-        if (n == -1) {
+        if (n == -1)
+        {
             perror("[-] Failed to receive from server on TCP");
             closeUDPSocket();
             closeTCPSocket();
             exit(EXIT_FAILURE);
         }
-        if (n > 0) {
+        if (n > 0)
+        {
             bytesRecv += n;
             fwrite(bufFile, sizeof(unsigned char), n, retFile);
         }

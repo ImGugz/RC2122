@@ -4,3 +4,4 @@
 - Testar nomes de grupos (hifens, letras, numeros, etc)
 - Verificar tamanhos das macros se funcionam no Linux do pc do lab
 - Ver se os perrors contam como sycalls falhadas e terminar execução
+- Como tratar de erros de sockets no servidor?
