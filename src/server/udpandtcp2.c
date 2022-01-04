@@ -85,7 +85,7 @@ void setupDSSockets()
 }
 
 /**
- * @brief Infinetly waits for client sockets' communications and handles them
+ * @brief Infinitly waits for client sockets' communications and handles them
  *
  */
 void waitConnection()
