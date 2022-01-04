@@ -199,7 +199,7 @@ void processTCPMsg(char * buffer, int * flag) {
             *flag = 1;
         } 
         else if (!strcmp(statusDS, "NOK")) {
-            fprintf(stderr, "[-] Failed to post in group. Please try again.\n");
+            fprintf(stderr, "[-] Failed to retrieve from group. Please check if you have a selected subscribed group and try again.\n");
             * flag = 0;
         } 
         else if (!strcmp(statusDS, "EOF")) {
@@ -337,6 +337,7 @@ void exchangeTCPMsg(char * message) {
     char msgRecvBuf[TCP_READ_SIZE] = "";
     char * oldPtr, * listRecvBuf;
     connectTCPSocket();
+    printf("Message: %s\b", message);
     sendTCP(message);
     oldPtr = (char *) calloc(sizeof(char), TCP_READ_SIZE + 1);
     if (oldPtr == NULL) {

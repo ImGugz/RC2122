@@ -10,6 +10,16 @@
 #define MAX_GROUPS 100 // It's actually 99 but we'll round it
 #define MIN(x, y) (((x) < (y)) ? (x) : (y)) // Macro to determine min(x, y)
 
+int validPort(char * portStr) {
+    if (isNumber(portStr)) {
+        int portNum = atoi(portStr);
+        if (0 <= portNum && portNum <= 65535) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 /**
  * @brief Reads user executable arguments and parses them.
  * 
@@ -27,30 +37,30 @@ void parseArgs(int argc, char * argv[]) {
         switch(c) {
             case 'n':
                 if (strcmp(optarg, "-p") == 0) { // corner case (./user -n -p 58011)
-                    fprintf(stderr, "[-] Missing argument (n). Please try again.\n");
+                    fprintf(stderr, "[-] Missing argument (n). Usage: ./user [-n DSIP] [-p DSport].\n");
                     exit(EXIT_FAILURE);
                 }
                 strcpy(addrDS, optarg);
                 break;
             case 'p':
                 if (strcmp(optarg, "-n") == 0) { // corner case (./user -p -n)
-                    fprintf(stderr, "[-] Missing argument (p). Please try again.\n");
+                    fprintf(stderr, "[-] Missing argument (p). Usage: ./user [-n DSIP] [-p DSport].\n");
                     exit(EXIT_FAILURE);
                 }
-                if (!isNumber(optarg)) {
+                if (!validPort(optarg)) {
                     fprintf(stderr, "[-] Invalid port number. Please try again.\n");
                     exit(EXIT_FAILURE);
                 } 
                 strcpy(portDS, optarg);
                 break;
             case ':':
-                fprintf(stderr, "[-] Missing argument. Please try again.\n");
+                fprintf(stderr, "[-] Usage: ./user [-n DSIP] [-p DSport]. Please try again.\n");
                 exit(EXIT_FAILURE);
             case '?':
-                fprintf(stderr, "[-] Unknown flag. Please try again.\n");
+                fprintf(stderr, "[-] Usage: ./user [-n DSIP] [-p DSport]. Please try again.\n");
                 exit(EXIT_FAILURE);
             default:
-                fprintf(stderr, "[-] Something went wrong. Please try again.\n");
+                fprintf(stderr, "[-] Usage: ./user [-n DSIP] [-p DSport]. Please try again.\n");
                 exit(EXIT_FAILURE);
         }
     }
