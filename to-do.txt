@@ -5,3 +5,4 @@
 - Verificar tamanhos das macros se funcionam no Linux do pc do lab
 - Ver se os perrors contam como sycalls falhadas e terminar execução
 - Como tratar de erros de sockets no servidor?
+- Se fecharmos o cliente, o server mantem o login?
