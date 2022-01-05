@@ -3,16 +3,12 @@
 int verbose = 0;
 int fdDSUDP, fdListenTCP;
 struct addrinfo hintsUDP, hintsTCP, *resUDP, *resTCP;
-int errcode;
-int maxfd;
-fd_set dsSet;
+int errcode, n;
 
-#define MAX(a, b) (((a) > (b)) ? (a) : (b))
+char portDS[PORT_SIZE] = DEFAULT_DSPORT;
 
-char portDS[PORT_SIZE];
-
-void setupDSSockets()
-{
+void setupDSSockets() {
+    char hostname[1024];
     // UDP
     fdDSUDP = socket(AF_INET, SOCK_DGRAM, 0);
     if (fdDSUDP == -1)
@@ -23,18 +19,23 @@ void setupDSSockets()
     memset(&hintsUDP, 0, sizeof(hintsUDP));
     hintsUDP.ai_family = AF_INET;
     hintsUDP.ai_socktype = SOCK_DGRAM;
-    errcode = getaddrinfo(DEFAULT_DSADDR, portDS, &hintsUDP, &resUDP);
-    if (errcode != 0)
-    {
+    hintsUDP.ai_flags = AI_PASSIVE;
+    errcode = getaddrinfo(NULL, portDS, &hintsUDP, &resUDP);
+    if (errcode != 0) {
         perror("[-] Failed on UDP address translation");
+        close(fdDSUDP);
+        exit(EXIT_FAILURE);
+    }
+    n = bind(fdDSUDP, resUDP->ai_addr, resUDP->ai_addrlen);
+    if (n == -1) {
+        perror("[-] Failed to bind UDP server");
         close(fdDSUDP);
         exit(EXIT_FAILURE);
     }
 
     // TCP
     fdListenTCP = socket(AF_INET, SOCK_STREAM, 0);
-    if (fdListenTCP == -1)
-    {
+    if (fdListenTCP == -1) {
         perror("[-] Server TCP socket failed to create");
         closeUDPSocket();
         exit(EXIT_FAILURE);
@@ -42,26 +43,41 @@ void setupDSSockets()
     memset(&hintsTCP, 0, sizeof(hintsTCP));
     hintsTCP.ai_family = AF_INET;
     hintsTCP.ai_socktype = SOCK_STREAM;
-    errcode = getaddrinfo(DEFAULT_DSADDR, portDS, &hintsTCP, &resTCP);
-    if (errcode != 0)
-    {
+    hintsTCP.ai_flags = AI_PASSIVE;
+    errcode = getaddrinfo(NULL, portDS, &hintsTCP, &resTCP);
+    if (errcode != 0) {
         perror("[-] Failed on TCP address translation");
         closeUDPSocket();
         close(fdListenTCP);
         exit(EXIT_FAILURE);
     }
-    if (listen(fdListenTCP, DEFAULT_LISTENQ) == -1)
-    {
+    n = bind(fdListenTCP, resTCP->ai_addr, resTCP->ai_addrlen);
+    if (n == 1) {
+        perror("[-] Server TCP socket failed to bind");
+        closeUDPSocket();
+        closeTCPSocket();
+        exit(EXIT_FAILURE);
+    }
+    if (listen(fdListenTCP, DEFAULT_LISTENQ) == -1) {
         perror("[-] Failed to prepare TCP socket to accept connections");
         closeUDPSocket();
         closeTCPSocket();
         exit(EXIT_FAILURE);
     }
-    maxfd = MAX(fdDSUDP, fdListenTCP) + 1;
-    FD_ZERO(&dsSet);
-    // To remove: this is just to test at the beggining
-    closeUDPSocket();
-    closeTCPSocket();
+
+    gethostname(hostname, 1023);
+    hostname[strlen(hostname)-1] = '\0';
+    printf("[+] DS server started at %s.\nCurrently listening in port %s for UDP and TCP connections...\n\n", hostname, portDS);
+
+    pid_t pid = fork();
+    if (pid == 0) { // Child process will handle everything related to UDP
+        handleUDP(fdDSUDP);
+    } else if (pid > 0) { // Parent process will handle everything related to TCP
+        handleTCP(fdListenTCP);
+    } else {
+        perror("[-] Failed on fork");
+        exit(EXIT_FAILURE);
+    }
 }
 
 /**

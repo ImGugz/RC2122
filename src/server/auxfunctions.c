@@ -1,11 +1,7 @@
 #include "auxfunctions.h"
 
 int validPort(char * portStr) {
-    if (isNumber(portStr)) {
-        int port = atoi(portStr);
-        if (0 <= port && port <= 65535) return 1;
-    }
-    return 0;
+    return validRegex(portStr, "^([0-9]{1,4}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$");
 }
 
 /**
@@ -27,7 +23,12 @@ void parseArgs(int argc, char * argv[]) {
                     fprintf(stderr, "[-] Usage: ./DS [-p DSport] [-v].\n");
                     exit(EXIT_FAILURE);
                 }
-                if (validPort(optarg)) strcpy(portDS, optarg);
+                if (!validPort(optarg))
+                {
+                    fprintf(stderr, "[-] Invalid port number. Please try again.\n");
+                    exit(EXIT_FAILURE);
+                }
+                strcpy(portDS, optarg);
                 break;
             case 'v':
                 verbose = 1;
@@ -47,19 +48,53 @@ void parseArgs(int argc, char * argv[]) {
 }
 
 /**
- * @brief Checks if a given string is a number.
- * 
- * @param num string containing (or not) a number
- * @return 0 if it's not a number and 1 otherwise
+ * @brief Checks if a given buffer specifies a given pattern.
+ *
+ * @param buf buffer to be checked
+ * @param reg pattern that buffer is being checked on
+ * @return 1 if buffer specifies the given pattern and 0 otherwise
  */
-int isNumber(char * num) {
-    size_t len = strlen(num);
-    for (int i = 0; i < len; ++i) {
-        if (num[i] < '0' || num[i] > '9') {
-            return 0;
-        }
+int validRegex(char * buf, char * reg)
+{
+    int reti;
+    regex_t regex;
+    reti = regcomp(&regex, reg, REG_EXTENDED);
+    if (reti)
+    {
+        fprintf(stderr, "[-] Internal error on parsing regex. Please try again later and/or contact the developers.\n");
+        return 0;
     }
+    if (regexec(&regex, buf, (size_t)0, NULL, 0))
+    {
+        regfree(&regex);
+        return 0;
+    }
+    regfree(&regex);
     return 1;
+}
+
+int parseUserCommandUDP(char *command)
+{
+    if (strcmp(command, "REG") == 0)
+        return REGISTER;
+    else if (strcmp(command, "UNR") == 0)
+        return UNREGISTER;
+    else if (strcmp(command, "LOG") == 0)
+        return LOGIN;
+    else if (strcmp(command, "OUT") == 0)
+        return LOGOUT;
+    else if (strcmp(command, "GLS") == 0)
+        return GROUPS_LIST;
+    else if (strcmp(command, "GSR") == 0)
+        return SUBSCRIBE;
+    else if (strcmp(command, "GUR") == 0)
+        return UNSUBSCRIBE;
+    else if (strcmp(command, "GLM") == 0)
+        return USER_GROUPS;
+    else {
+        fprintf(stderr, "[-] Invalid protocol command code received. Please try again.\n");
+        return INVALID_COMMAND;
+    }
 }
 
 int timerOn(int fd) {

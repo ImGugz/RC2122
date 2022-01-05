@@ -10,17 +10,13 @@
 #define MAX_GROUPS 100                      // It's actually 99 but we'll round it
 #define MIN(x, y) (((x) < (y)) ? (x) : (y)) // Macro to determine min(x, y)
 
-int validPort(char *portStr)
-{
-    if (isNumber(portStr))
-    {
-        int portNum = atoi(portStr);
-        if (0 <= portNum && portNum <= 65535)
-        {
-            return 1;
-        }
-    }
-    return 0;
+int validAddress(char * addrStr) {
+    return (validRegex(addrStr, "^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]).)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9-]*[A-Za-z0-9])$") ||
+            validRegex(addrStr, "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5]).){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$"));
+}
+
+int validPort(char * portStr) {
+    return validRegex(portStr, "^([0-9]{1,4}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$");
 }
 
 /**
@@ -46,6 +42,11 @@ void parseArgs(int argc, char *argv[])
             if (strcmp(optarg, "-p") == 0)
             { // corner case (./user -n -p 58011)
                 fprintf(stderr, "[-] Missing argument (n). Usage: ./user [-n DSIP] [-p DSport].\n");
+                exit(EXIT_FAILURE);
+            }
+            if (!validAddress(optarg)) 
+            {
+                fprintf(stderr, "[-] Invalid given address. Please try again.\n");
                 exit(EXIT_FAILURE);
             }
             strcpy(addrDS, optarg);
@@ -89,10 +90,7 @@ int isNumber(char *num)
     size_t len = strlen(num);
     for (int i = 0; i < len; ++i)
     {
-        if (num[i] < '0' || num[i] > '9')
-        {
-            return 0;
-        }
+        if (num[i] < '0' || num[i] > '9') return 0;
     }
     return 1;
 }

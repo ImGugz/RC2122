@@ -6,6 +6,10 @@
 #include "auxfunctions.h"
 #include "execute-commands.h"
 
-void processCommands();
+#define MAX_RECVUDP_SIZE 4096
+#define MAX_RECVTCP_SIZE 512
+
+void handleUDP(int clientSocket);
+void handleTCP(int listenSocket);
 
 #endif

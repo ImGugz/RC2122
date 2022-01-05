@@ -423,7 +423,6 @@ void exchangeTCPMsg(char *message)
     char msgRecvBuf[TCP_READ_SIZE] = "";
     char *oldPtr, *listRecvBuf;
     connectTCPSocket();
-    printf("Message: %s\b", message);
     sendTCP(message);
     oldPtr = (char *)calloc(sizeof(char), TCP_READ_SIZE + 1);
     if (oldPtr == NULL)

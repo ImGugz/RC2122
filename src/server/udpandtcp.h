@@ -17,6 +17,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <errno.h>
+#include <sys/wait.h>
 #include "commands.h"
 
 #define DEFAULT_DSADDR "127.0.0.1" // localhost

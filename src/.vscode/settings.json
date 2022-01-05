@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "auxfunctions.h": "c",
+        "udpandtcp.h": "c"
+    }
+}
