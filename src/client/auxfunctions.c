@@ -216,6 +216,17 @@ int isSlash(char *slash)
 }
 
 /**
+ * @brief Checks if a string is a MID (0000 <= MID <= 9999)
+ * 
+ * @param MID string containing (or not) a MID
+ * @return 1 if it's a MID, 0 otherwise
+ */
+int isMID(char *MID)
+{
+    return validRegex(MID, "^[0-9]{0,4}$");
+}
+
+/**
  * @brief Prints groups from gl and ulist commands.
  *
  * @param buffer DS protocol response to gl and ulist commands
@@ -244,7 +255,7 @@ void printGroups(char *buffer, int numGroups)
     }
     for (int i = 0; i <= cnt - 3; i += 3)
     {
-        if (!(validGID(groupsList[i]) && validGName(groupsList[i + 1]) && validMID(groupsList[i + 2])))
+        if (!(validGID(groupsList[i]) && validGName(groupsList[i + 1]) && isMID(groupsList[i + 2])))
         {
             printf("[-] Incorrect groups list protocol message was received. Program will now exit.\n");
             closeUDPSocket();
