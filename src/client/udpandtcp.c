@@ -137,7 +137,10 @@ void processUDPMsg(char *buffer)
         }
         else if (!strcmp(statusDS, "NEW"))
         {
-            printf("[+] You have successfully created a new group (ID = %s).\n", buffer + 8); // 8 is the fixed offset from buffer to the new GID
+            char GID[3];
+            strncpy(GID, buffer + 8, 2);
+            GID[2] = '\0';
+            printf("[+] You have successfully created a new group (ID = %s).\n", GID); // 8 is the fixed offset from buffer to the new GID
         }
         else if (!strcmp(statusDS, "E_FULL"))
         {
@@ -509,11 +512,11 @@ void exchangeTCPRet(char *message)
     int nMsg = atoi(numRRTMsgs);
     if (nMsg == 1)
     {
-        printf("%d message to display: (MID | UID | Tsize | text [| Fname | Fsize]):\n", nMsg);
+        printf("[+] %d message to display: (-> MID: text \\(Fname - Fsize)):\n", nMsg);
     }
     else
     {
-        printf("%d messages to display: (MID | UID | Tsize | text [| Fname | Fsize]):\n", nMsg);
+        printf("[+] %d messages to display: (-> MID: text \\(Fname - Fsize)):\n", nMsg);
     }
     while (1)
     {
@@ -562,7 +565,7 @@ void exchangeTCPRet(char *message)
                 exit(EXIT_FAILURE);
             }
             textBuf[nTCP - 1] = '\0'; // will never SIGSEGV (-1 because of extra space read)
-            printf("-> MID=%s | UID=%s | Tsize=%s | Text=%s", slashOrMID, fileNameOrUID, textOrFileSize, textBuf);
+            printf("-> %s: %s\n", slashOrMID, textBuf);
         }
         else if (strlen(slashOrMID) == 1 && slashOrMID[0] == '/')
         { // File case
@@ -574,7 +577,7 @@ void exchangeTCPRet(char *message)
                 exit(EXIT_FAILURE);
             }
             recvFile(fileNameOrUID, bytesToRead);
-            printf("| Fname=%s | Fsize=%s\n", fileNameOrUID, textOrFileSize);
+            printf("(%s - %s bytes)\n", fileNameOrUID, textOrFileSize);
             if ((nTCP = readTCP(backspace, BACKSPACE_SIZE - 1, 0)) == -1)
             { // Update stream pointer consistency
                 exit(EXIT_FAILURE);
