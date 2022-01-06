@@ -8,10 +8,21 @@
 #include "udpandtcp.h"
 #include "auxfunctions.h"
 
-#define DSCODE_SIZE 4      // maxlen(reply code) + 1
-#define DSSTATUS_SIZE 8    // maxlen(status code) + 1 = len(E_GNAME) + 1
-#define UDP_RECV_SIZE 4096 // 2 ^ math.top(log_2(3307))
-#define TCP_READ_SIZE 512  // Arbitrary
+#define DSCODE_SIZE 4       // maxlen(reply code) + 1
+#define DSSTATUS_SIZE 8     // maxlen(status code) + 1 = len(E_GNAME) + 1
+#define UDP_RECVF_SIZE 4096 // 2 ^ math.top(log_2(3274)) (maxlen(glcmd) = 3274)
+#define TCP_READ_SIZE 512   // Arbitrary
+
+#define MAX_RPT_SIZE 10     // maxlen(rpt xxxx\n) + 1
+#define RRT_CODESTAT_SIZE 8 // maxlen(rrt) + 1 (RRT NOK\n)
+#define MAX_NUMRRT_SIZE 3   // maxlen(20) + 1
+#define BACKSPACE_SIZE 2    // len(' ') + 1
+#define RRT_BUFFER_SIZE 256 // arbitrary
+#define SLASH_MID_SIZE 5    // max(1, 4) + 1
+#define UID_FNAME_SIZE 25   // max(5, 24) + 1
+#define FILE_TEXT_SIZE 11   // max(3, 10) + 1
+#define MAX_TEXT_SIZE 242   // maxlen(text) + backspace + 1
+#define BACKSPACE 1         // used for avoiding meaningless "+1" in offset calcs
 
 int fdDSUDP, fdDSTCP;
 int errcode;
@@ -20,7 +31,7 @@ struct sockaddr_in addrUDP;
 socklen_t addrlenUDP;
 
 char addrDS[ADDR_SIZE], portDS[PORT_SIZE];
-ssize_t nUDP; // Used to store number of bytes sent/received in messages exchanged in UDP/TCP protocol
+ssize_t nUDP, nTCP; // Used to store number of bytes sent/received in messages exchanged in UDP/TCP protocol
 
 /**
  * @brief Reads DS's UDP response and gives the user a brief report following the statement's protocol.
@@ -39,11 +50,11 @@ void processUDPMsg(char *buffer)
         }
         else if (!strcmp(statusDS, "DUP"))
         {
-            fprintf(stderr, "[-] This user is already registered in DS.\n");
+            fprintf(stderr, "[-] This user is already registered in the DS database.\n");
         }
         else if (!strcmp(statusDS, "NOK"))
         {
-            fprintf(stderr, "[-] Something went wrong with the registration process. Please try again later.\n");
+            fprintf(stderr, "[-] Something went wrong with register. Please try again later.\n");
         }
         else
         {
@@ -60,7 +71,7 @@ void processUDPMsg(char *buffer)
         }
         else if (!strcmp(statusDS, "NOK"))
         {
-            fprintf(stderr, "[-] Something went wrong. Please check user credentials and try again.\n");
+            fprintf(stderr, "[-] Something went wrong with unregister. Please check user credentials and try again.\n");
         }
         else
         {
@@ -78,7 +89,7 @@ void processUDPMsg(char *buffer)
         }
         else if (!strcmp(statusDS, "NOK"))
         {
-            fprintf(stderr, "[-] Something went wrong. Please check user credentials and try again.\n");
+            fprintf(stderr, "[-] Something went wrong with login. Please check user credentials and try again.\n");
         }
         else
         {
@@ -96,7 +107,7 @@ void processUDPMsg(char *buffer)
         }
         else if (!strcmp(statusDS, "NOK"))
         {
-            fprintf(stderr, "[-] Something went wrong. Please check user credentials and try again.\n");
+            fprintf(stderr, "[-] Something went wrong with logout. Please try again and/or contact the developers.\n");
         }
         else
         {
@@ -126,7 +137,7 @@ void processUDPMsg(char *buffer)
         }
         else if (!strcmp(statusDS, "NEW"))
         {
-            printf("[+] You have successfully created a new group (ID = %d).\n", atoi(buffer + 8));
+            printf("[+] You have successfully created a new group (ID = %s).\n", buffer + 8); // 8 is the fixed offset from buffer to the new GID
         }
         else if (!strcmp(statusDS, "E_FULL"))
         {
@@ -138,7 +149,7 @@ void processUDPMsg(char *buffer)
         }
         else if (!strcmp(statusDS, "E_GRP"))
         {
-            fprintf(stderr, "[-] Group ID submitted is invalid. Please check available groups and try again.\n");
+            fprintf(stderr, "[-] Group ID submitted is invalid. Please check available groups using 'gl' command and try again.\n");
         }
         else if (!strcmp(statusDS, "E_GNAME"))
         {
@@ -146,7 +157,7 @@ void processUDPMsg(char *buffer)
         }
         else if (!strcmp(statusDS, "NOK"))
         {
-            fprintf(stderr, "[-] The subscribing process has failed. Please try again.\n");
+            fprintf(stderr, "[-] The group subscribing process has failed. Please try again.\n");
         }
         else
         {
@@ -167,7 +178,7 @@ void processUDPMsg(char *buffer)
         }
         else if (!strcmp(statusDS, "E_GRP"))
         {
-            fprintf(stderr, "[-] Group ID submitted is invalid. Please check available groups and try again.\n");
+            fprintf(stderr, "[-] Invalid given group ID. Please check available groups using 'gl' command and try again.\n");
         }
         else
         {
@@ -236,7 +247,7 @@ void processTCPMsg(char *buffer, int *flag)
     }
     else if (!strcmp(codeDS, "RPT"))
     { // POST command
-        if (strlen(statusDS) == 4 && isNumber(statusDS))
+        if (validMID(statusDS))
         {
             printf("[+] You have successfully posted in the selected group with message ID %s.\n", statusDS);
         }
@@ -294,11 +305,7 @@ void processTCPMsg(char *buffer, int *flag)
  */
 void setAddrPortDS(char *addr, char *port)
 {
-    if (strlen(addr) > 63 || strlen(port) > 5)
-    {
-        fprintf(stderr, "[-] Please insert a valid domain name/port.\n");
-        return;
-    }
+    // Validation was already made - safe strcpies
     strcpy(addrDS, addr);
     strcpy(portDS, port);
 }
@@ -368,7 +375,7 @@ void connectTCPSocket()
  */
 void exchangeUDPMsg(char *message)
 {
-    char recvBuffer[UDP_RECV_SIZE] = "";
+    char recvBuffer[UDP_RECVF_SIZE] = "";
     nUDP = sendto(fdDSUDP, message, strlen(message), 0, resUDP->ai_addr, resUDP->ai_addrlen);
     if (nUDP == -1)
     { // Syscall failed -> terminate gracefully
@@ -377,13 +384,14 @@ void exchangeUDPMsg(char *message)
         exit(EXIT_FAILURE);
     }
     addrlenUDP = sizeof(addrUDP);
-    nUDP = recvfrom(fdDSUDP, recvBuffer, UDP_RECV_SIZE, 0, (struct sockaddr *)&addrUDP, &addrlenUDP);
+    nUDP = recvfrom(fdDSUDP, recvBuffer, UDP_RECVF_SIZE, 0, (struct sockaddr *)&addrUDP, &addrlenUDP);
     if (nUDP == -1)
     {
         perror("[-] Failed to receive UDP message");
         closeUDPSocket();
         exit(EXIT_FAILURE);
     }
+    recvBuffer[nUDP] = '\0'; // will never SIGSEGV
     processUDPMsg(recvBuffer);
 }
 
@@ -399,15 +407,16 @@ void exchangeTCPPost(char *message, FILE *post, long lenFile)
     connectTCPSocket();
     sendTCP(message);
     if (!sendFile(post, lenFile))
-    {
+    { // sendFile already handles proper pre-exiting operations (close file stream, socket fd's, etc)
         exit(EXIT_FAILURE);
-    } // sendFile already closes socket's fds and post stream upon error
-    char msgRecvBuf[9];
-    if (readTCP(msgRecvBuf, 9, 0) == -1)
-    {
+    }
+    char msgRecvBuf[MAX_RPT_SIZE];
+    if ((nTCP = readTCP(msgRecvBuf, MAX_RPT_SIZE - 1, 0)) == -1)
+    { // readTCP already closes socket's fds upon error
         fclose(post);
         exit(EXIT_FAILURE);
-    } // readTCP already closes socket's fds upon error
+    }
+    msgRecvBuf[nTCP] = '\0'; // will never SIGSEGV
     processTCPMsg(msgRecvBuf, NULL);
     closeTCPSocket();
 }
@@ -419,7 +428,7 @@ void exchangeTCPPost(char *message, FILE *post, long lenFile)
  */
 void exchangeTCPMsg(char *message)
 {
-    int n, bytesRecv = 0;
+    int bytesRecv = 0;
     char msgRecvBuf[TCP_READ_SIZE] = "";
     char *oldPtr, *listRecvBuf;
     connectTCPSocket();
@@ -433,9 +442,9 @@ void exchangeTCPMsg(char *message)
     }
     listRecvBuf = oldPtr;
     int lenBuf = TCP_READ_SIZE;
-    while ((n = readTCP(msgRecvBuf, TCP_READ_SIZE, 0)) > 0)
+    while ((nTCP = readTCP(msgRecvBuf, TCP_READ_SIZE, 0)) > 0)
     { // Read all data
-        if (bytesRecv + n >= lenBuf)
+        if (bytesRecv + nTCP >= lenBuf)
         { // Buffer isn't big enough -> must realloc
             char *newPtr = (char *)realloc(listRecvBuf, 2 * lenBuf);
             if (newPtr == NULL)
@@ -448,9 +457,10 @@ void exchangeTCPMsg(char *message)
             listRecvBuf = newPtr;
             lenBuf *= 2;
         }
-        memcpy(listRecvBuf + bytesRecv, msgRecvBuf, n);
-        bytesRecv += n;
+        memcpy(listRecvBuf + bytesRecv, msgRecvBuf, nTCP);
+        bytesRecv += nTCP;
     }
+    listRecvBuf[bytesRecv] = '\0'; // will never SIGSEGV (worst case when it gets here bytesRecv = lenBuf-1)
     processTCPMsg(listRecvBuf, NULL);
     free(listRecvBuf);
     closeTCPSocket();
@@ -463,69 +473,120 @@ void exchangeTCPMsg(char *message)
  */
 void exchangeTCPRet(char *message)
 {
-    int flag, nMsg;
-    char msgRecvBuf[8] = "", numRetMsgs[3] = "", backspace[2] = "";
-    char textBuf[256] = "", retBuf[256] = "", tempBuf1[5] = "", tempBuf2[25] = "", tempBuf3[11] = ""; // 5 = 1 + max(1, 4) ; 25 = 1 + max(24, 5); 11 = 1 + max(10, 3)
-    int nRecv;
-    char *retDel, *temp;
+    char codeStatus[RRT_CODESTAT_SIZE], numRRTMsgs[MAX_NUMRRT_SIZE], backspace[BACKSPACE_SIZE];
+    char rrtBuf[RRT_BUFFER_SIZE], textBuf[MAX_TEXT_SIZE];
+    char slashOrMID[SLASH_MID_SIZE], fileNameOrUID[UID_FNAME_SIZE], textOrFileSize[FILE_TEXT_SIZE];
+    char *rrtOffset, *temp;
     size_t offset;
     connectTCPSocket();
     sendTCP(message);
-    if (readTCP(msgRecvBuf, 7, 0) == -1)
-        exit(EXIT_FAILURE);           // Read code and status
-    processTCPMsg(msgRecvBuf, &flag); // flag as pointer to be set in processTCPMsg function
+    if ((nTCP = readTCP(codeStatus, RRT_CODESTAT_SIZE - 1, 0)) == -1)
+    { // Read code and status
+        exit(EXIT_FAILURE);
+    }
+    codeStatus[nTCP] = '\0'; // \n will be ignored (irrelevant) -> will never SIGSEGV
+    int flag;
+    processTCPMsg(codeStatus, &flag); // flag as pointer to be set in processTCPMsg function
     if (!flag)
-    {
+    { // flag = 1 : messages to retrieve, flag = 0 : no messages to retrieve/error
         closeTCPSocket();
         return;
-    } // EOF or NOK
-    if (readTCP(numRetMsgs, 2, 0) == -1)
-        exit(EXIT_FAILURE); // Read number of messages to read
-    if (atoi(numRetMsgs) >= 10)
-    {
-        if (readTCP(backspace, 1, 0) == -1)
+    }
+    if ((nTCP = readTCP(numRRTMsgs, MAX_NUMRRT_SIZE - 1, 0)) == -1)
+    { // Read number of messages to read
+        exit(EXIT_FAILURE);
+    }
+    numRRTMsgs[nTCP] = '\0'; // will never SIGSEGV
+    if (atoi(numRRTMsgs) >= 10)
+    { // if there are more than 10 messages we must read an extra space to match the pointer
+        // in the case where there are < 10 messages
+        if ((nTCP = readTCP(backspace, BACKSPACE_SIZE - 1, 0)) == -1)
+        {
             exit(EXIT_FAILURE);
-    } // Update stream pointer consistency (< 10 read an extra backspace)
-    nMsg = atoi(numRetMsgs);
-    printf("%d messages to display: (MID | UID | Tsize | text [| Fname | Fsize]):\n", nMsg);
+        }
+        backspace[nTCP] = '\0'; // will never SIGSEGV
+    }
+    int nMsg = atoi(numRRTMsgs);
+    if (nMsg == 1)
+    {
+        printf("%d message to display: (MID | UID | Tsize | text [| Fname | Fsize]):\n", nMsg);
+    }
+    else
+    {
+        printf("%d messages to display: (MID | UID | Tsize | text [| Fname | Fsize]):\n", nMsg);
+    }
     while (1)
     {
         memset(textBuf, 0, sizeof(textBuf));
-        memset(retBuf, 0, sizeof(retBuf));
-        nRecv = readTCP(retBuf, 255, MSG_PEEK); // Assumes at least offset bytes will come (few) -> EXTREMELY RELIABLE
-        retBuf[nRecv] = '\0';
-        if (nRecv == -1)
+        memset(rrtBuf, 0, sizeof(rrtBuf));
+        nTCP = readTCP(rrtBuf, RRT_BUFFER_SIZE - 1, MSG_PEEK); // Assumes at least offset bytes will come (few) -> EXTREMELY RELIABLE
+        if (nTCP == -1)
+        {
             exit(EXIT_FAILURE);
-        if (nRecv == 0 || (nRecv == 1 && retBuf[0] == '\n'))
+        }
+        rrtBuf[nTCP] = '\0';
+        if (nTCP == 0 || (nTCP == 1 && rrtBuf[0] == '\n'))
+        { // nothing else to read
             break;
-        sscanf(retBuf, "%s %s %s", tempBuf1, tempBuf2, tempBuf3);
-        offset = strlen(tempBuf1) + 1 + strlen(tempBuf2) + 1 + strlen(tempBuf3) + 1;
-        temp = (char *)calloc(sizeof(char), offset);
+        }
+        sscanf(rrtBuf, "%s %s %s", slashOrMID, fileNameOrUID, textOrFileSize);
+        offset = strlen(slashOrMID) + BACKSPACE + strlen(fileNameOrUID) + BACKSPACE + strlen(textOrFileSize) + BACKSPACE;
+        temp = (char *)calloc(sizeof(char), offset + 1);
         if (temp == NULL)
         {
             fprintf(stderr, "[-] Error allocating memory in heap. Please try again.\n");
             closeTCPSocket();
             return;
         }
-        retDel = temp;
-        if (readTCP(retDel, offset, 0) == -1)
-            exit(EXIT_FAILURE); // Read offset bytes to start reading text/file data
+        rrtOffset = temp;
+        if ((nTCP = readTCP(rrtOffset, offset, 0)) == -1)
+        { // Read offset bytes to start reading text/file data
+            free(rrtOffset);
+            exit(EXIT_FAILURE);
+        }
+        rrtOffset[nTCP] = '\0';
         free(temp);
         temp = NULL;
-        long bytesToRead = atol(tempBuf3);
-        if (strlen(tempBuf1) == 4 && isNumber(tempBuf1))
+        long bytesToRead = atol(textOrFileSize);
+        if (validMID(slashOrMID))
         { // Text case
-            if ((nRecv = readTCP(textBuf, bytesToRead + 1, 0)) == -1)
-                exit(EXIT_FAILURE);    // bytesToRead + 1 to read extra space
-            textBuf[nRecv - 1] = '\0'; // This will never segfault as textBuf is 256 length and max(nRecv) = 241 (-1 because of extra space read)
-            printf("-> MID=%s | UID=%s | Tsize=%s | Text=%s", tempBuf1, tempBuf2, tempBuf3, textBuf);
+            if (!(validMID(slashOrMID) && validUID(fileNameOrUID) && bytesToRead <= 240))
+            {
+                fprintf(stderr, "[-] Wrong protocol message received on retrieve. Program will now exit.\n");
+                closeUDPSocket();
+                closeTCPSocket();
+                exit(EXIT_FAILURE);
+            }
+            if ((nTCP = readTCP(textBuf, bytesToRead + BACKSPACE, 0)) == -1)
+            { // bytesToRead + 1 to read extra space
+                exit(EXIT_FAILURE);
+            }
+            textBuf[nTCP - 1] = '\0'; // will never SIGSEGV (-1 because of extra space read)
+            printf("-> MID=%s | UID=%s | Tsize=%s | Text=%s", slashOrMID, fileNameOrUID, textOrFileSize, textBuf);
         }
-        else if (strlen(tempBuf1) == 1 && tempBuf1[0] == '/')
+        else if (strlen(slashOrMID) == 1 && slashOrMID[0] == '/')
+        { // File case
+            if (!(validFilename(fileNameOrUID) && strlen(textOrFileSize) <= 10))
+            {
+                fprintf(stderr, "[-] Wrong protocol message received on retrieve. Program will now exit.\n");
+                closeUDPSocket();
+                closeTCPSocket();
+                exit(EXIT_FAILURE);
+            }
+            recvFile(fileNameOrUID, bytesToRead);
+            printf("| Fname=%s | Fsize=%s\n", fileNameOrUID, textOrFileSize);
+            if ((nTCP = readTCP(backspace, BACKSPACE_SIZE - 1, 0)) == -1)
+            { // Update stream pointer consistency
+                exit(EXIT_FAILURE);
+            }
+            backspace[nTCP] = '\0';
+        }
+        else
         {
-            recvFile(tempBuf2, bytesToRead);
-            printf("| Fname=%s | Fsize=%ld\n", tempBuf2, bytesToRead);
-            if (readTCP(backspace, 1, 0) == -1)
-                ; // Update stream pointer consistency
+            fprintf(stderr, "[-] Wrong protocol message received on retrieve. Program will now exit\n");
+            closeUDPSocket();
+            closeTCPSocket();
+            exit(EXIT_FAILURE);
         }
     }
     closeTCPSocket();

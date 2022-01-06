@@ -20,24 +20,24 @@
 #include "execute-commands.h"
 
 #define DEFAULT_DSADDR "127.0.0.1" // localhost
-#define DEFAULT_DSPORT "58018" // 58000 + group ID
-#define ADDR_SIZE 64 // maxlen(domain names) + 1
-#define PORT_SIZE 6 // len(65535) + 1
+#define DEFAULT_DSPORT "58018"     // 58000 + group ID
+#define ADDR_SIZE 64               // maxlen(domain names) + 1
+#define PORT_SIZE 6                // len(65535) + 1
 
 extern int fdDSTCP; // File descriptor for TCP socket to be used in auxiliary functions
 
 // Setup functions
-void setAddrPortDS(char * addr, char * port);
+void setAddrPortDS(char *addr, char *port);
 void createUDPSocket();
 
 // UDP related functions
-void exchangeUDPMsg(char * message);
+void exchangeUDPMsg(char *message);
 void closeUDPSocket();
 
 // TCP related functions
-void exchangeTCPMsg(char * message);
-void exchangeTCPPost(char * message, FILE * toPost, long lenFile);
-void exchangeTCPRet(char * message);
+void exchangeTCPMsg(char *message);
+void exchangeTCPPost(char *message, FILE *toPost, long lenFile);
+void exchangeTCPRet(char *message);
 void closeTCPSocket();
 
 #endif

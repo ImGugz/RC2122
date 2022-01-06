@@ -21,9 +21,9 @@ void processCommands()
         int numTokens = 0;
         printf("USER: ");
         fgets(command, sizeof(command), stdin);
-        strtok(command, "\n");
+        strtok(command, "\n"); // Command needs to be saved from strtok for POST command
         strcpy(tmp, command);
-        // Separate all command args into tokens and store it into array
+        // Split all command args into tokens and store it into array
         token = strtok(tmp, " \n");
         while (token != NULL)
         {

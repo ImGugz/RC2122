@@ -33,22 +33,21 @@
 #define GROUP_RETRIEVE 13
 #define SHOW_SELECTED 14
 #define SHOW_USER 15
- 
-int validUID(char * UID);
-int validPW(char * PW);
-int validGID(char * GID);
-int validGName(char * gName);
-int validFilename(char * fileName);
-int validMID(char * MID);
-void parseArgs(int argc, char * argv[]);
-int isNumber(char * num);
-void printGroups(char * buffer, int numGroups);
-int parseUserCommand(char * command);
-int validRegex(char * buf, char * reg);
-int sendData(char * buffer, size_t num);
-int sendFile(FILE * post, long lenFile);
-void sendTCP(char * message);
-int readTCP(char * message, int maxSize, int flag);
-void recvFile(char * fileName, long bytesToRead);
+
+int validUID(char *UID);
+int validPW(char *PW);
+int validGID(char *GID);
+int validGName(char *gName);
+int validFilename(char *fileName);
+int validMID(char *MID);
+void parseArgs(int argc, char *argv[]);
+int isNumber(char *num);
+void printGroups(char *buffer, int numGroups);
+int parseUserCommand(char *command);
+int sendData(char *buffer, size_t num);
+int sendFile(FILE *post, long lenFile);
+void sendTCP(char *message);
+int readTCP(char *message, int maxSize, int flag);
+void recvFile(char *fileName, long bytesToRead);
 
 #endif

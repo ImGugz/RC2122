@@ -7,23 +7,21 @@
 
 #include "execute-commands.h"
 
-#define USERID_SIZE 6
-#define USERPWD_SIZE 9
-#define GID_SIZE 6
-#define MSGTXT_SIZE 241
-#define MAXFN_SIZE 25
-
-#define USR_REGEX_SIZE 512
-#define SERVMSG_SIZE 512
+#define USERID_SIZE 6    // len(UID) + 1
+#define USERPWD_SIZE 9   // len(UPW) + 1
+#define GID_SIZE 6       // len(GID) + 1
+#define MSGTXT_SIZE 241  // maxlen(MSGTXT) + 1
+#define MAXFN_SIZE 25    // maxlen(MSGFILE) + 1
+#define SERVMSG_SIZE 512 // 2 ^ (math.top(log_2(maxlen(MSG2SRV)))) = 2 ^ 9 (maxlen(MSG2SRV) comes from POST)
 
 // Logged in user's details
 char activeUser[USERID_SIZE] = "";
 char activeUserPwd[USERPWD_SIZE] = "";
+// Selected group
 char activeGID[GID_SIZE] = "";
 
 char serverMessage[SERVMSG_SIZE] = ""; // Message that'll be sent to DS following the statement's protocol
-char commandArgs[USR_REGEX_SIZE] = ""; // Command arguments that are checked for regex
-int userSession = LOGGED_OUT; // Keeps user's account activity log (LOGGED IN OR LOGGED OUT)
+int userSession = LOGGED_OUT;          // Keeps user's account activity log (LOGGED IN OR LOGGED OUT)
 
 /**
  * @brief User register command - creates a new account on DS.
@@ -31,13 +29,16 @@ int userSession = LOGGED_OUT; // Keeps user's account activity log (LOGGED IN OR
  * @param tokenList List containing all command arguments (including the command itself)
  * @param numTokens Number of command arguments
  */
-void userRegister(char ** tokenList, int numTokens) {
-    if (numTokens != 3) {
+void userRegister(char **tokenList, int numTokens)
+{
+    if (numTokens != 3)
+    {
         fprintf(stderr, "[-] Incorrect register command usage. Please try again.\n");
         return;
     }
-    if (!(validUID(tokenList[1]) && validPW(tokenList[2]))) {
-        fprintf(stderr, "[-] Invalid register command usage. Please check UID and/or password and try again.\n");
+    if (!(validUID(tokenList[1]) && validPW(tokenList[2])))
+    {
+        fprintf(stderr, "[-] Invalid register command arguments. Please check given UID and/or password and try again.\n");
         return;
     }
     sprintf(serverMessage, "REG %s %s\n", tokenList[1], tokenList[2]);
@@ -50,13 +51,16 @@ void userRegister(char ** tokenList, int numTokens) {
  * @param tokenList List containing all command arguments (including the command itself)
  * @param numTokens Number of command arguments
  */
-void userUnregister(char ** tokenList, int numTokens) {
-    if (numTokens != 3) {
+void userUnregister(char **tokenList, int numTokens)
+{
+    if (numTokens != 3)
+    {
         fprintf(stderr, "[-] Incorrect unregister command usage. Please try again.\n");
         return;
     }
-    if (!(validUID(tokenList[1]) && validPW(tokenList[2]))) {
-        fprintf(stderr, "[-] Invalid unregister command usage. Please check UID and/or password and try again.\n");
+    if (!(validUID(tokenList[1]) && validPW(tokenList[2])))
+    {
+        fprintf(stderr, "[-] Invalid unregister command arguments. Please check given UID and/or password and try again.\n");
         return;
     }
     sprintf(serverMessage, "UNR %s %s\n", tokenList[1], tokenList[2]);
@@ -69,23 +73,29 @@ void userUnregister(char ** tokenList, int numTokens) {
  * @param tokenList List containing all command arguments (including the command itself)
  * @param numTokens Number of command arguments
  */
-void userLogin(char ** tokenList, int numTokens) {
-    if (userSession == LOGGED_IN) {
-        fprintf(stderr, "[-] You're already logged in. Please logout before you try to log in.\n");
+void userLogin(char **tokenList, int numTokens)
+{
+    if (userSession == LOGGED_IN)
+    {
+        fprintf(stderr, "[-] You're already logged in. Please logout before you try to log in again.\n");
         return;
     }
-    if (numTokens != 3) {
+    if (numTokens != 3)
+    {
         fprintf(stderr, "[-] Incorrect login command usage. Please try again.\n");
         return;
     }
-    if (!(validUID(tokenList[1]) && validPW(tokenList[2]))) {
-        fprintf(stderr, "[-] Invalid login command usage. Please check UID and/or password and try again.\n");
+    if (!(validUID(tokenList[1]) && validPW(tokenList[2])))
+    {
+        fprintf(stderr, "[-] Invalid login command arguments. Please check given UID and/or password and try again.\n");
         return;
     }
     sprintf(serverMessage, "LOG %s %s\n", tokenList[1], tokenList[2]);
     exchangeUDPMsg(serverMessage);
-    if (userSession == LOGGED_IN) { // User session is an extern variable that is modified if LOG protocol response is OK
-        strcpy(activeUser, tokenList[1]); strcpy(activeUserPwd, tokenList[2]);
+    if (userSession == LOGGED_IN)
+    { // User session is an extern variable that is modified if LOG protocol response is OK
+        strcpy(activeUser, tokenList[1]);
+        strcpy(activeUserPwd, tokenList[2]);
     }
 }
 
@@ -95,18 +105,22 @@ void userLogin(char ** tokenList, int numTokens) {
  * @param tokenList List containing all command arguments (including the command itself)
  * @param numTokens Number of command arguments
  */
-void userLogout(char ** tokenList, int numTokens) {
-    if (userSession == LOGGED_OUT) {
+void userLogout(char **tokenList, int numTokens)
+{
+    if (userSession == LOGGED_OUT)
+    {
         fprintf(stderr, "[-] You're not logged in into any account.\n");
         return;
     }
-    if (numTokens != 1) {
+    if (numTokens != 1)
+    {
         fprintf(stderr, "[-] Incorrect logout command usage. Please try again.\n");
         return;
     }
     sprintf(serverMessage, "OUT %s %s\n", activeUser, activeUserPwd);
     exchangeUDPMsg(serverMessage);
-    if (userSession == LOGGED_OUT) { // User session is an extern variable that is modified if OUT protocol response is OK
+    if (userSession == LOGGED_OUT)
+    { // User session is an extern variable that is modified if OUT protocol response is OK
         memset(activeUser, 0, sizeof(activeUser));
         memset(activeUserPwd, 0, sizeof(activeUserPwd));
     }
@@ -117,15 +131,19 @@ void userLogout(char ** tokenList, int numTokens) {
  * 
  * @param numTokens Number of command arguments
  */
-void showActiveUser(int numTokens) {
-    if (userSession == LOGGED_OUT) {
+void showActiveUser(int numTokens)
+{
+    if (userSession == LOGGED_OUT)
+    {
         fprintf(stderr, "[-] You're not logged in into any account.\n");
         return;
     }
-    if (numTokens != 1) {
+    if (numTokens != 1)
+    {
         fprintf(stderr, "[-] Incorrect showuid command usage. Please try again.\n");
         return;
     }
+    // Safe to assume that if userSession == LOGGED_IN then activeUser is a valid string containing a valid UID
     printf("[+] You're logged in with user ID %s.\n", activeUser);
 }
 
@@ -134,8 +152,10 @@ void showActiveUser(int numTokens) {
  * 
  * @param numTokens Number of command arguments
  */
-void userExit(int numTokens) {
-    if (numTokens != 1) {
+void userExit(int numTokens)
+{
+    if (numTokens != 1)
+    {
         fprintf(stderr, "[-] Incorrect exit command usage. Please try again.\n");
         return;
     }
@@ -149,8 +169,10 @@ void userExit(int numTokens) {
  * 
  * @param numTokens Number of command arguments
  */
-void showGroups(int numTokens) {
-    if (numTokens != 1) {
+void showGroups(int numTokens)
+{
+    if (numTokens != 1)
+    {
         fprintf(stderr, "[-] Incorrect groups list command usage. Please try again.\n");
         return;
     }
@@ -164,25 +186,34 @@ void showGroups(int numTokens) {
  * @param tokenList List containing all command arguments (including the command itself)
  * @param numTokens Number of command arguments
  */
-void userGroupSubscribe(char ** tokenList, int numTokens) {
-    if (userSession == LOGGED_OUT) {
+void userGroupSubscribe(char **tokenList, int numTokens)
+{
+    if (userSession == LOGGED_OUT)
+    {
         fprintf(stderr, "[-] Please login before you subscribe to a group.\n");
         return;
     }
-    if (numTokens != 3) {
+    if (numTokens != 3)
+    {
         fprintf(stderr, "[-] Incorrect subscribe command usage. Please try again.\n");
         return;
     }
-    if (!strcmp(tokenList[1], "0")) { // Create a new group
-        if (!validGName(tokenList[2])) {
+    if (!strcmp(tokenList[1], "0"))
+    { // Create a new group
+        if (!validGName(tokenList[2]))
+        {
             fprintf(stderr, "[-] Invalid new group name. Please try again.\n");
             return;
         }
         sprintf(serverMessage, "GSR %s 00 %s\n", activeUser, tokenList[2]);
-    } else if (validGID(tokenList[1])) { // Subscribe to a group
+    }
+    else if (validGID(tokenList[1]) && validGName(tokenList[2]))
+    { // Subscribe to a group
         sprintf(serverMessage, "GSR %s %s %s\n", activeUser, tokenList[1], tokenList[2]);
-    } else {
-        fprintf(stderr, "[-] Incorrect subscribe command usage. Please try again.\n");
+    }
+    else
+    {
+        fprintf(stderr, "[-] Incorrect subscribe command usage. Please check if the given arguments follow the User-DS messaging protocol and try again.\n");
         return;
     }
     exchangeUDPMsg(serverMessage);
@@ -194,16 +225,20 @@ void userGroupSubscribe(char ** tokenList, int numTokens) {
  * @param tokenList List containing all command arguments (including the command itself)
  * @param numTokens Number of command arguments 
  */
-void userGroupUnsubscribe(char ** tokenList, int numTokens) {
-    if (userSession == LOGGED_OUT) {
+void userGroupUnsubscribe(char **tokenList, int numTokens)
+{
+    if (userSession == LOGGED_OUT)
+    {
         fprintf(stderr, "[-] Please login before you unsubscribe to a group.\n");
         return;
     }
-    if (numTokens != 2) {
+    if (numTokens != 2)
+    {
         fprintf(stderr, "[-] Incorrect unsubscribe command usage. Please try again.\n");
         return;
     }
-    if (!validGID(tokenList[1])) {
+    if (!validGID(tokenList[1]))
+    {
         fprintf(stderr, "[-] Invalid given group ID to unsubscribe. Please try again.\n");
         return;
     }
@@ -216,12 +251,15 @@ void userGroupUnsubscribe(char ** tokenList, int numTokens) {
  * 
  * @param numTokens Number of command arguments 
  */
-void userGroupsList(int numTokens) {
-    if (userSession == LOGGED_OUT) {
+void userGroupsList(int numTokens)
+{
+    if (userSession == LOGGED_OUT)
+    {
         fprintf(stderr, "[-] Please login before you request for your subscribed groups list.\n");
         return;
     }
-    if (numTokens != 1) {
+    if (numTokens != 1)
+    {
         fprintf(stderr, "[-] Incorrect user groups' list command usage. Please try again.\n");
         return;
     }
@@ -235,16 +273,20 @@ void userGroupsList(int numTokens) {
  * @param tokenList List containing all command arguments (including the command itself)
  * @param numTokens Number of command arguments 
  */
-void userSelectGroup(char ** tokenList, int numTokens) {
-    if (userSession == LOGGED_OUT) {
+void userSelectGroup(char **tokenList, int numTokens)
+{
+    if (userSession == LOGGED_OUT)
+    {
         fprintf(stderr, "[-] Please login before you select a group.\n");
         return;
     }
-    if (numTokens != 2) {
+    if (numTokens != 2)
+    {
         fprintf(stderr, "[-] Incorrect select command usage. Please try again.\n");
         return;
     }
-    if (!validGID(tokenList[1])) {
+    if (!validGID(tokenList[1]))
+    {
         fprintf(stderr, "[-] Invalid given group ID to select. Please try again.\n");
         return;
     }
@@ -258,14 +300,19 @@ void userSelectGroup(char ** tokenList, int numTokens) {
  * 
  * @param numTokens Number of command arguments 
  */
-void showSelectedGroup(int numTokens) {
-    if (numTokens != 1) {
+void showSelectedGroup(int numTokens)
+{
+    if (numTokens != 1)
+    {
         fprintf(stderr, "[-] Incorrect show select group command usage. Please try again.\n");
         return;
     }
-    if (strlen(activeGID) == 0) {
-        printf("[+] You haven't selected any group yet.\n");
-    } else { // We know that either it's "" or something with bigger length
+    if (strlen(activeGID) == 0)
+    {
+        printf("[-] You haven't selected any group yet.\n");
+    }
+    else
+    { // We know that either it's "" or something with bigger length
         printf("[+] Group %s is selected.\n", activeGID);
     }
 }
@@ -275,16 +322,20 @@ void showSelectedGroup(int numTokens) {
  * 
  * @param numTokens Number of command arguments 
  */
-void showUsersGroup(int numTokens) {
-    if (userSession == LOGGED_OUT) {
+void showUsersGroup(int numTokens)
+{
+    if (userSession == LOGGED_OUT)
+    {
         fprintf(stderr, "[-] Please login before you request the list of users that are subscribed to your selected group.\n");
         return;
     }
-    if (strlen(activeGID) == 0) {
+    if (strlen(activeGID) == 0)
+    {
         fprintf(stderr, "[-] Please select a group before you request the list of users that are subscribed to it.\n");
         return;
-    } 
-    if (numTokens != 1) {
+    }
+    if (numTokens != 1)
+    {
         fprintf(stderr, "[-] Incorrect list group's users command usage. Please try again.\n");
         return;
     }
@@ -298,45 +349,59 @@ void showUsersGroup(int numTokens) {
  * 
  * @param command Entire command given by the user (not separated by tokens like before)
  */
-void userPostGroup(char * command) {
-    if (userSession == LOGGED_OUT) {
+void userPostGroup(char *command)
+{
+    if (userSession == LOGGED_OUT)
+    {
         fprintf(stderr, "[-] Please login before you post to a group.\n");
         return;
     }
-    if (strlen(activeGID) == 0) {
+    if (strlen(activeGID) == 0)
+    {
         fprintf(stderr, "[-] Please select a group before you post on it.\n");
         return;
     }
     char messageText[MSGTXT_SIZE] = "";
     char fileName[MAXFN_SIZE] = "";
     sscanf(command, "post \"%240[^\"]\" %s", messageText, fileName);
-    if (strlen(fileName) > 0) { // fileName was 'filled up' with something
-        if (!validFilename(fileName)) {
+    if (strlen(fileName) > 0)
+    { // fileName was 'filled up' with something
+        if (!validFilename(fileName))
+        {
             fprintf(stderr, "[-] The file you submit can't exceed 24 characters and must have a 3 letter file extension. Please try again.\n");
             return;
         }
-        FILE * post = fopen(fileName, "rb");
-        if (post == NULL) {
-            fprintf(stderr, "[-] The file you submit must be in your own directory. Please check given file and try again.\n");
+        FILE *post = fopen(fileName, "rb");
+        if (post == NULL)
+        {
+            fprintf(stderr, "[-] The file you submit must be in your working directory. Please check the given file name and try again.\n");
             return;
         }
-        if (fseek(post, 0, SEEK_END) == -1) {
+        if (fseek(post, 0, SEEK_END) == -1)
+        {
             perror("[-] Post file seek failed");
-            return;
+            closeUDPSocket();
+            exit(EXIT_FAILURE); // Failed syscall
         }
         long lenFile = ftell(post); // long because it can have at most 10 digits and int goes to 2^31 - 1 which is 214--.7 (len 10) - it can be 999 999 999 9 bytes
-        if (lenFile == -1) {
+        if (lenFile == -1)
+        {
             perror("[-] Post file tell failed");
-            return;
+            closeUDPSocket();
+            exit(EXIT_FAILURE); // Failed syscall
         }
-        if (fseek(post, 0, SEEK_SET) == -1) {
+        if (fseek(post, 0, SEEK_SET) == -1)
+        {
             perror("[-] Post file seek failed");
-            return;
+            closeUDPSocket();
+            exit(EXIT_FAILURE); // Failed syscall
         }
         sprintf(serverMessage, "PST %s %s %ld %s %s %ld ", activeUser, activeGID, strlen(messageText), messageText, fileName, lenFile);
         exchangeTCPPost(serverMessage, post, lenFile);
         fclose(post);
-    } else {
+    }
+    else
+    {
         sprintf(serverMessage, "PST %s %s %ld %s\n", activeUser, activeGID, strlen(messageText), messageText);
         exchangeTCPMsg(serverMessage);
     }
@@ -348,20 +413,25 @@ void userPostGroup(char * command) {
  * @param tokenList List containing all command arguments (including the command itself)
  * @param numTokens Number of command arguments 
  */
-void userRetrieveMsgs(char ** tokenList, int numTokens) {
-    if (userSession == LOGGED_OUT) {
+void userRetrieveMsgs(char **tokenList, int numTokens)
+{
+    if (userSession == LOGGED_OUT)
+    {
         fprintf(stderr, "[-] Please login before you retrieve messages from a group.\n");
         return;
     }
-    if (strlen(activeGID) == 0) {
+    if (strlen(activeGID) == 0)
+    {
         fprintf(stderr, "[-] Please select a group before you retrieve messages from it.\n");
         return;
     }
-    if (numTokens != 2 || strlen(tokenList[1]) != 4 || !isNumber(tokenList[1])) {
+    if (numTokens != 2)
+    {
         fprintf(stderr, "[-] Incorrect retrieve command usage. Please try again.\n");
         return;
     }
-    if (!validMID(tokenList[1])) {
+    if (!validMID(tokenList[1]))
+    {
         fprintf(stderr, "[-] Invalid starting message to retrieve. Please try again.\n");
         return;
     }
