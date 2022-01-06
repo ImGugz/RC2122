@@ -26,11 +26,14 @@ int validRegex(char *buf, char *reg);
 void parseArgs(int argc, char *argv[]);
 int parseUserCommandUDP(char *command);
 char *createStatusMessage(char *command, int status);
+char *createNewGroupStatusMessage(char *GID);
 int removeDirectory(const char *path);
 int isDirectoryExists(const char *path);
 int isCorrectPassword(const char *userDir, const char *userID, const char *pass);
+int isCorrectGroupName(const char *groupDir, const char *GID, const char *groupName);
 int listGroupsDir();
 char *createGroupListMessage(int numGroups);
+int validGName(char *gName);
 int timerOn(int fd);
 int timerOff(int fd);
 

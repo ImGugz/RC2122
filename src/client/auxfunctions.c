@@ -38,9 +38,9 @@ int validRegex(char *buf, char *reg)
 
 /**
  * @brief Checks if a given address is valid according to pre-defined protocols.
- * 
+ *
  * @param addrStr address to check if it's valid
- * @return 1 if addrStr is a valid hostname/ipv4 address, 0 otherwise 
+ * @return 1 if addrStr is a valid hostname/ipv4 address, 0 otherwise
  */
 int validAddress(char *addrStr)
 {
@@ -50,7 +50,7 @@ int validAddress(char *addrStr)
 
 /**
  * @brief Checks if a given port is valid according to pre-defined protocols.
- * 
+ *
  * @param portStr port to check if it's valid
  * @return 1 if portStr is a valid port number, 0 otherwise
  */
@@ -61,7 +61,7 @@ int validPort(char *portStr)
 
 /**
  * @brief Checks if a given user ID is valid according to the statement's rules.
- * 
+ *
  * @param UID user ID to check if it's valid
  * @return 1 if UID is valid, 0 otherwise
  */
@@ -72,7 +72,7 @@ int validUID(char *UID)
 
 /**
  * @brief Checks if a given user password is valid according to the statement's rules.
- * 
+ *
  * @param PW user password to check if it's valid
  * @return 1 if PW is valid, 0 otherwise
  */
@@ -83,7 +83,7 @@ int validPW(char *PW)
 
 /**
  * @brief Checks if a given group ID is valid according to the statement's rules.
- * 
+ *
  * @param GID group ID to check if it's valid
  * @return 1 if GID is valid, 0 otherwise
  */
@@ -94,7 +94,7 @@ int validGID(char *GID)
 
 /**
  * @brief Checks if a given group name is valid according to the statement's rules.
- * 
+ *
  * @param gName group name to check if it's valid
  * @return 1 if gName is valid, 0 otherwise
  */
@@ -105,7 +105,7 @@ int validGName(char *gName)
 
 /**
  * @brief Checks if a given file name is valid according to the statement's rules.
- * 
+ *
  * @param fileName file name to check if it's valid
  * @return 1 if fileName is valid, 0 otherwise
  */
@@ -116,7 +116,7 @@ int validFilename(char *fileName)
 
 /**
  * @brief Checks if a given message ID is valid according to the statement's rules.
- * 
+ *
  * @param MID message ID to check if it's valid
  * @return 1 if MID is valid, 0 otherwise
  */
@@ -206,8 +206,8 @@ int isNumber(char *num)
 
 /**
  * @brief Checks if a given string is a slash.
- * 
- * @param slash string containing (or not) a slash 
+ *
+ * @param slash string containing (or not) a slash
  * @return 1 if it's a slash, 0 otherwise
  */
 int isSlash(char *slash)
@@ -217,7 +217,7 @@ int isSlash(char *slash)
 
 /**
  * @brief Checks if a string is a MID (0000 <= MID <= 9999)
- * 
+ *
  * @param MID string containing (or not) a MID
  * @return 1 if it's a MID, 0 otherwise
  */

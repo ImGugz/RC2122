@@ -128,9 +128,30 @@ char *createStatusMessage(char *command, int statusCode)
     case DUP:
         sprintf(status, "%s %s", command, "DUP\n");
         break;
+    case E_USR:
+        sprintf(status, "%s %s", command, "E_USR\n");
+        break;
+    case E_GRP:
+        sprintf(status, "%s %s", command, "E_GRP\n");
+        break;
+    case E_GNAME:
+        sprintf(status, "%s %s", command, "E_GNAME\n");
+        break;
+    case E_FULL:
+        sprintf(status, "%s %s", command, "E_FULL\n");
+        break;
     default:
         break;
     }
+    return strdup(status);
+}
+
+char *createNewGroupStatusMessage(char *GID)
+{
+    char status[MAX_RECVUDP_SIZE];
+
+    sprintf(status, "RGS NEW %s", GID);
+
     return strdup(status);
 }
 
@@ -221,6 +242,51 @@ int isCorrectPassword(const char *userDir, const char *userID, const char *pass)
     }
 
     free(password);
+    return 1;
+}
+
+int isCorrectGroupName(const char *groupDir, const char *GID, const char *groupName)
+{
+    FILE *fPtr;
+    char groupNameFile[42];
+    char *realGroupName;
+    int length;
+    size_t n;
+
+    sprintf(groupNameFile, "%s/%s_name.txt", groupDir, GID);
+
+    fPtr = fopen(groupNameFile, "r");
+    if (fPtr == NULL)
+    {
+        fprintf(stderr, "[-] Unable to open group name file.\n");
+        return 0;
+    }
+
+    fseek(fPtr, 0, SEEK_END);
+    length = ftell(fPtr);
+    fseek(fPtr, 0, SEEK_SET);
+
+    realGroupName = calloc(sizeof(char), length + 1);
+
+    if (realGroupName)
+    {
+        n = fread(realGroupName, 1, length, fPtr);
+        if (n == -1)
+            return 0;
+    }
+    else
+        return 0;
+
+    fclose(fPtr);
+    realGroupName[n] = '\0';
+
+    if (strcmp(realGroupName, groupName) != 0)
+    {
+        free(realGroupName);
+        return 0;
+    }
+
+    free(realGroupName);
     return 1;
 }
 
@@ -324,6 +390,11 @@ char *createGroupListMessage(int numGroups)
     }
     ptr += sprintf(ptr, "\n");
     return strdup(listGroups);
+}
+
+int validGName(char *gName)
+{
+    return validRegex(gName, "^[a-zA-Z0-9_-]{1,24}$");
 }
 
 int timerOn(int fd)

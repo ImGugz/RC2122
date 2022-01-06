@@ -9,9 +9,15 @@
 #include <sys/stat.h>
 #include <dirent.h>
 
-#define OK 1
-#define NOK 2
-#define DUP 3
+#define ERR 1
+#define OK 2
+#define NOK 3
+#define DUP 4
+#define E_USR 5
+#define E_GRP 6
+#define E_GNAME 7
+#define E_FULL 8
+#define NEW 9
 
 #define MAX_GROUPS 100
 #define MAX_GID_SIZE 3
@@ -36,5 +42,6 @@ int userUnregister(char **tokenlist, int numTokens);
 int userLogin(char **tokenList, int numTokens);
 int userLogout(char **tokenList, int numTokens);
 int listGroups(int numTokens);
+int userSubscribe(char **tokenList, int numTokens, char *newGID);
 
 #endif

@@ -9,7 +9,7 @@ char *processClientUDP(char *buf)
     char tmp[CMDBUF_SIZE];
     int numTokens = 0;
     int op, status;
-    char *response;
+    char *response, *newGID;
     strtok(buf, "\n");
     strcpy(tmp, buf);
     token = strtok(tmp, " \n");
@@ -42,6 +42,17 @@ char *processClientUDP(char *buf)
     case GROUPS_LIST:
         status = listGroups(numTokens);
         response = createGroupListMessage(status);
+        break;
+    case SUBSCRIBE:
+        newGID = calloc(sizeof(char), 3);
+        status = userSubscribe(tokenList, numTokens, newGID);
+        if (status == NEW)
+        {
+            response = createNewGroupStatusMessage(newGID);
+            free(newGID);
+        }
+        else
+            response = createStatusMessage("RGS", status);
         break;
     default:
         break;
