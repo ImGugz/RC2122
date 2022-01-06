@@ -288,3 +288,43 @@ int userSubscribe(char **tokenList, int numTokens, char *newGID)
         return OK;
     }
 }
+
+int userUnsubscribe(char ** tokenList, int numTokens) {
+
+    if (numTokens != 3) {
+        fprintf(stderr, "[-] Incorrect user subscribe command usage. Please try again.\n");
+        return NOK;
+    }
+
+    // Check if user is registered
+    char userDirname[12];
+    sprintf(userDirname, "USERS/%s", tokenList[1]);
+
+    if (isDirectoryExists(userDirname) == 0) {
+        // fprintf(stderr, "[-] User is not previously registered. Please try again.\n");
+        return E_USR;
+    } else {
+        char groupDirName[13];
+        sprintf(groupDirName, "GROUPS/%s", tokenList[2]);
+        printf("Vou procurar a seguinte diretoria: %s\n", groupDirName);
+
+        // Check if group exists
+        if (isDirectoryExists(groupDirName) == 0) {
+            // fprintf(stderr, "[-] Invalid group number. Please try again.\n");
+            return E_GRP;
+        } else { //UID and GID valid
+            char filename[20];
+            sprintf(filename, "GROUPS/%s/%s.txt", tokenList[2], tokenList[1]);
+            if(unlink(filename) != 0 && errno != ENOENT) {
+               fprintf(stderr, "Error deleting file.\n");
+               exit(EXIT_FAILURE); //TODO exit???
+            } else {
+                return OK;
+            }
+            
+        }
+
+    }
+
+
+}

@@ -54,6 +54,10 @@ char *processClientUDP(char *buf)
         else
             response = createStatusMessage("RGS", status);
         break;
+    case UNSUBSCRIBE:
+        status = userUnsubscribe(tokenList, numTokens);
+        response = createStatusMessage("RGU", status);
+        break;
     default:
         break;
     }
