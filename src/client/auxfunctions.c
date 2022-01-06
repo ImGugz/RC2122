@@ -19,6 +19,31 @@ int validPort(char * portStr) {
     return validRegex(portStr, "^([0-9]{1,4}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$");
 }
 
+int validUID(char * UID) {
+    return validRegex(UID, "^[0-9]{5}$");
+}
+
+int validPW(char * PW) {
+    return validRegex(PW, "^[a-zA-Z0-9]{8}$");
+}
+
+int validGID(char * GID) {
+    return validRegex(GID, "^([0][1-9]|[1-9][0-9])$");
+}
+
+int validGName(char * gName) {
+    return validRegex(gName, "^[a-zA-Z0-9_-]{1,24}$");
+}
+
+int validFilename(char * fileName) {
+    return validRegex(fileName, "^[a-zA-Z0-9_-]{1,20}[.]{1}[a-z]{3}$");
+}
+
+int validMID(char * MID) {
+    if (!strcmp(MID, "0000")) return 0;
+    return validRegex(MID, "^[0-9]{0,4}$");
+}
+
 /**
  * @brief Reads user executable arguments and parses them.
  *

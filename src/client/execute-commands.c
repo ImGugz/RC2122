@@ -36,9 +36,8 @@ void userRegister(char ** tokenList, int numTokens) {
         fprintf(stderr, "[-] Incorrect register command usage. Please try again.\n");
         return;
     }
-    sprintf(commandArgs, "%s %s", tokenList[1], tokenList[2]);
-    if (!validRegex(commandArgs, "^[0-9]{5} [a-zA-Z0-9]{8}$")) {
-        fprintf(stderr, "[-] Incorrect register command usage. Please check UID and/or password and try again.\n");
+    if (!(validUID(tokenList[1]) && validPW(tokenList[2]))) {
+        fprintf(stderr, "[-] Invalid register command usage. Please check UID and/or password and try again.\n");
         return;
     }
     sprintf(serverMessage, "REG %s %s\n", tokenList[1], tokenList[2]);
@@ -56,9 +55,8 @@ void userUnregister(char ** tokenList, int numTokens) {
         fprintf(stderr, "[-] Incorrect unregister command usage. Please try again.\n");
         return;
     }
-    sprintf(commandArgs, "%s %s", tokenList[1], tokenList[2]);
-    if (!validRegex(commandArgs, "^[0-9]{5} [a-zA-Z0-9]{8}$")) {
-        fprintf(stderr, "[-] Incorrect unregister command usage. Please check UID and/or password and try again.\n");
+    if (!(validUID(tokenList[1]) && validPW(tokenList[2]))) {
+        fprintf(stderr, "[-] Invalid unregister command usage. Please check UID and/or password and try again.\n");
         return;
     }
     sprintf(serverMessage, "UNR %s %s\n", tokenList[1], tokenList[2]);
@@ -80,9 +78,8 @@ void userLogin(char ** tokenList, int numTokens) {
         fprintf(stderr, "[-] Incorrect login command usage. Please try again.\n");
         return;
     }
-    sprintf(commandArgs, "%s %s", tokenList[1], tokenList[2]);
-    if (!validRegex(commandArgs, "^[0-9]{5} [a-zA-Z0-9]{8}$")) {
-        fprintf(stderr, "[-] Incorrect login command usage. Please check UID and/or password and try again.\n");
+    if (!(validUID(tokenList[1]) && validPW(tokenList[2]))) {
+        fprintf(stderr, "[-] Invalid login command usage. Please check UID and/or password and try again.\n");
         return;
     }
     sprintf(serverMessage, "LOG %s %s\n", tokenList[1], tokenList[2]);
@@ -125,6 +122,10 @@ void showActiveUser(int numTokens) {
         fprintf(stderr, "[-] You're not logged in into any account.\n");
         return;
     }
+    if (numTokens != 1) {
+        fprintf(stderr, "[-] Incorrect showuid command usage. Please try again.\n");
+        return;
+    }
     printf("[+] You're logged in with user ID %s.\n", activeUser);
 }
 
@@ -134,6 +135,10 @@ void showActiveUser(int numTokens) {
  * @param numTokens Number of command arguments
  */
 void userExit(int numTokens) {
+    if (numTokens != 1) {
+        fprintf(stderr, "[-] Incorrect exit command usage. Please try again.\n");
+        return;
+    }
     closeUDPSocket();
     printf("[+] Exiting...\n");
     exit(EXIT_SUCCESS);
@@ -168,9 +173,13 @@ void userGroupSubscribe(char ** tokenList, int numTokens) {
         fprintf(stderr, "[-] Incorrect subscribe command usage. Please try again.\n");
         return;
     }
-    if (!strcmp(tokenList[1], "0")) {
+    if (!strcmp(tokenList[1], "0")) { // Create a new group
+        if (!validGName(tokenList[2])) {
+            fprintf(stderr, "[-] Invalid new group name. Please try again.\n");
+            return;
+        }
         sprintf(serverMessage, "GSR %s 00 %s\n", activeUser, tokenList[2]);
-    } else if (isNumber(tokenList[1]) && strlen(tokenList[1]) == 2 && strcmp(tokenList[1], "00")) { // 00 is used for creating a new one
+    } else if (validGID(tokenList[1])) { // Subscribe to a group
         sprintf(serverMessage, "GSR %s %s %s\n", activeUser, tokenList[1], tokenList[2]);
     } else {
         fprintf(stderr, "[-] Incorrect subscribe command usage. Please try again.\n");
@@ -192,6 +201,10 @@ void userGroupUnsubscribe(char ** tokenList, int numTokens) {
     }
     if (numTokens != 2) {
         fprintf(stderr, "[-] Incorrect unsubscribe command usage. Please try again.\n");
+        return;
+    }
+    if (!validGID(tokenList[1])) {
+        fprintf(stderr, "[-] Invalid given group ID to unsubscribe. Please try again.\n");
         return;
     }
     sprintf(serverMessage, "GUR %s %s\n", activeUser, tokenList[1]);
@@ -227,8 +240,12 @@ void userSelectGroup(char ** tokenList, int numTokens) {
         fprintf(stderr, "[-] Please login before you select a group.\n");
         return;
     }
-    if (numTokens != 2 || strlen(tokenList[1]) != 2 || !isNumber(tokenList[1]) || !strcmp(tokenList[1], "00")) {
+    if (numTokens != 2) {
         fprintf(stderr, "[-] Incorrect select command usage. Please try again.\n");
+        return;
+    }
+    if (!validGID(tokenList[1])) {
+        fprintf(stderr, "[-] Invalid given group ID to select. Please try again.\n");
         return;
     }
     memset(activeGID, 0, sizeof(activeGID));
@@ -294,7 +311,7 @@ void userPostGroup(char * command) {
     char fileName[MAXFN_SIZE] = "";
     sscanf(command, "post \"%240[^\"]\" %s", messageText, fileName);
     if (strlen(fileName) > 0) { // fileName was 'filled up' with something
-        if (!validRegex(fileName, "^[a-zA-Z0-9_-]{1,20}[.]{1}[a-z]{3}$")) {
+        if (!validFilename(fileName)) {
             fprintf(stderr, "[-] The file you submit can't exceed 24 characters and must have a 3 letter file extension. Please try again.\n");
             return;
         }
@@ -342,6 +359,10 @@ void userRetrieveMsgs(char ** tokenList, int numTokens) {
     }
     if (numTokens != 2 || strlen(tokenList[1]) != 4 || !isNumber(tokenList[1])) {
         fprintf(stderr, "[-] Incorrect retrieve command usage. Please try again.\n");
+        return;
+    }
+    if (!validMID(tokenList[1])) {
+        fprintf(stderr, "[-] Invalid starting message to retrieve. Please try again.\n");
         return;
     }
     sprintf(serverMessage, "RTV %s %s %s\n", activeUser, activeGID, tokenList[1]);

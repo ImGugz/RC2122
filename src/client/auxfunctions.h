@@ -34,6 +34,12 @@
 #define SHOW_SELECTED 14
 #define SHOW_USER 15
  
+int validUID(char * UID);
+int validPW(char * PW);
+int validGID(char * GID);
+int validGName(char * gName);
+int validFilename(char * fileName);
+int validMID(char * MID);
 void parseArgs(int argc, char * argv[]);
 int isNumber(char * num);
 void printGroups(char * buffer, int numGroups);
