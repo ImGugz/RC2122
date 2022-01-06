@@ -375,7 +375,7 @@ void connectTCPSocket()
  */
 void exchangeUDPMsg(char *message)
 {
-    char recvBuffer[UDP_RECVF_SIZE] = "";
+    char recvBuffer[UDP_RECVF_SIZE];
     nUDP = sendto(fdDSUDP, message, strlen(message), 0, resUDP->ai_addr, resUDP->ai_addrlen);
     if (nUDP == -1)
     { // Syscall failed -> terminate gracefully
@@ -429,7 +429,7 @@ void exchangeTCPPost(char *message, FILE *post, long lenFile)
 void exchangeTCPMsg(char *message)
 {
     int bytesRecv = 0;
-    char msgRecvBuf[TCP_READ_SIZE] = "";
+    char msgRecvBuf[TCP_READ_SIZE];
     char *oldPtr, *listRecvBuf;
     connectTCPSocket();
     sendTCP(message);

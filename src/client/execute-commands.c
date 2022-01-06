@@ -361,7 +361,7 @@ void userPostGroup(char *command)
         fprintf(stderr, "[-] Please select a group before you post on it.\n");
         return;
     }
-    char messageText[MSGTXT_SIZE] = "";
+    char messageText[MSGTXT_SIZE];
     char fileName[MAXFN_SIZE] = "";
     sscanf(command, "post \"%240[^\"]\" %s", messageText, fileName);
     if (strlen(fileName) > 0)
