@@ -21,7 +21,7 @@
 #define UNSUBSCRIBE 7
 #define USER_GROUPS 8
 
-int validMID(char * MID);
+int validMID(char *MID);
 int validRegex(char *buf, char *reg);
 void parseArgs(int argc, char *argv[]);
 int parseUserCommandUDP(char *command);
@@ -30,7 +30,7 @@ int removeDirectory(const char *path);
 int isDirectoryExists(const char *path);
 int isCorrectPassword(const char *userDir, const char *userID, const char *pass);
 int listGroupsDir();
-char * createGroupListMessage(int numGroups);
+char *createGroupListMessage(int numGroups);
 int timerOn(int fd);
 int timerOff(int fd);
 

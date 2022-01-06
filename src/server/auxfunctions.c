@@ -7,8 +7,10 @@ int validPort(char *portStr)
     return validRegex(portStr, "^([0-9]{1,4}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$");
 }
 
-int validMID(char * MID) {
-    if (!strcmp(MID, "0000")) return 0;
+int validMID(char *MID)
+{
+    if (!strcmp(MID, "0000"))
+        return 0;
     return validRegex(MID, "^[0-9]{0,4}$");
 }
 
@@ -132,14 +134,14 @@ char *createStatusMessage(char *command, int statusCode)
     return strdup(status);
 }
 
-int removeDirectory(const char * path)
+int removeDirectory(const char *path)
 {
-    DIR * d = opendir(path);
+    DIR *d = opendir(path);
     size_t path_len = strlen(path);
     int r = -1;
     if (d)
     {
-        struct dirent * p;
+        struct dirent *p;
         r = 0;
         while (!r && (p = readdir(d)))
         {
@@ -197,16 +199,17 @@ int isCorrectPassword(const char *userDir, const char *userID, const char *pass)
         return 0;
     }
 
-    password = calloc(sizeof(char), USERPW_SIZE + 1); // Nao sei onde por uma macro PASSWORD_SIZE
+    password = calloc(sizeof(char), USERPW_SIZE + 1);
 
-    if (password) {
+    if (password)
+    {
         n = fread(password, 1, USERPW_SIZE, fPtr);
-        if (n == -1) {
+        if (n == -1)
             return 0;
-        }
-    } else {
-        return 0;
     }
+    else
+        return 0;
+
     password[n] = '\0';
     fclose(fPtr);
 
@@ -221,13 +224,15 @@ int isCorrectPassword(const char *userDir, const char *userID, const char *pass)
     return 1;
 }
 
-int compare(const void * a, const void * b) {
-    GROUPINFO * q1 = (GROUPINFO *) a;
-    GROUPINFO * q2 = (GROUPINFO *) b;
+int compare(const void *a, const void *b)
+{
+    GROUPINFO *q1 = (GROUPINFO *)a;
+    GROUPINFO *q2 = (GROUPINFO *)b;
     return strcmp(q1->no, q2->no);
 }
 
-void sortGList(GROUPLIST * list) {
+void sortGList(GROUPLIST *list)
+{
     printf("I'll now qsort with:\n");
     printf("B: list->groupinfo[0].no = %s and list->groupinfo[0].name = %s\n", list->groupinfo[0].no, list->groupinfo[0].name);
     printf("I have %d groups\n", list->no_groups);
@@ -235,17 +240,18 @@ void sortGList(GROUPLIST * list) {
     printf("A: list->groupinfo[0].no = %s and list->groupinfo[0].name = %s\n", list->groupinfo[0].no, list->groupinfo[0].name);
 }
 
-int listGroupsDir() {
-    DIR * d;
-    struct dirent * dir;
+int listGroupsDir()
+{
+    DIR *d;
+    struct dirent *dir;
     int i = 0;
-    FILE * fp;
+    FILE *fp;
     char GIDname[530]; // compiler was complaining about this size
     (&dsGroups)->no_groups = 0;
     d = opendir("GROUPS");
     if (d)
     {
-        while ((dir = readdir(d)) != NULL) 
+        while ((dir = readdir(d)) != NULL)
         {
             if (!strcmp(dir->d_name, ".") || !strcmp(dir->d_name, ".."))
                 continue;
@@ -254,42 +260,54 @@ int listGroupsDir() {
             strcpy((&dsGroups)->groupinfo[i].no, dir->d_name);
             sprintf(GIDname, "GROUPS/%s/%s_name.txt", dir->d_name, dir->d_name);
             fp = fopen(GIDname, "r");
-            if (fp) 
+            if (fp)
             {
                 fscanf(fp, "%24s", (&dsGroups)->groupinfo[i].name);
                 fclose(fp);
             }
             ++i;
-            if (i == 99) break;
+            if (i == 99)
+                break;
         }
         (&dsGroups)->no_groups = i;
         closedir(d);
-    } else
+    }
+    else
         return 0;
-    if((&dsGroups)->no_groups > 1) {
+    if ((&dsGroups)->no_groups > 1)
+    {
         sortGList((&dsGroups));
     }
     return ((&dsGroups)->no_groups);
 }
 
-char * createGroupListMessage(int numGroups) {
+char *createGroupListMessage(int numGroups)
+{
     char listGroups[MAX_RECVUDP_SIZE] = "";
-    char * ptr = listGroups;
+    char *ptr = listGroups;
     ptr += sprintf(ptr, "RGL %d", numGroups);
-    if (numGroups > 0) {
-        struct dirent ** d;
+    if (numGroups > 0)
+    {
+        struct dirent **d;
         int n, flag;
         char groupPath[MAX_GNAME_SIZE];
-        for (int i = 0; i < numGroups; ++i) {
+        for (int i = 0; i < numGroups; ++i)
+        {
             sprintf(groupPath, "GROUPS/%s/MSG", dsGroups.groupinfo[i].no);
             n = scandir(groupPath, &d, 0, alphasort);
-            if (n < 0) {
+            if (n < 0)
+            {
                 perror("[-] scandir on grouppath");
-            } else {
+            }
+            else
+            {
                 flag = 0;
-                while (n--) {
-                    if (!flag) { 
-                        if (validMID(d[n]->d_name)) { // Check for garbage
+                while (n--)
+                {
+                    if (!flag)
+                    {
+                        if (validMID(d[n]->d_name))
+                        { // Check for garbage
                             ptr += sprintf(ptr, " %s %s %s", dsGroups.groupinfo[i].no, dsGroups.groupinfo[i].name, d[n]->d_name);
                             flag = 1;
                         }
@@ -297,7 +315,8 @@ char * createGroupListMessage(int numGroups) {
                     free(d[n]);
                 }
                 free(d);
-                if (!flag) { // No messages are in the group
+                if (!flag)
+                { // No messages are in the group
                     ptr += sprintf(ptr, " %s %s 0000", dsGroups.groupinfo[i].no, dsGroups.groupinfo[i].name);
                 }
             }
