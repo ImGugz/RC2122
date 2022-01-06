@@ -135,7 +135,7 @@ int userLogout(char **tokenList, int numTokens)
     // Check if user is logged in
     if (fp = fopen(loginFileName, "r"))
     {
-        if (remove(loginFileName) == 0)
+        if (unlink(loginFileName) == 0)
             return OK;
         fprintf(stderr, "[-] Unable to delete login file.\n");
     }
@@ -143,8 +143,10 @@ int userLogout(char **tokenList, int numTokens)
     return NOK;
 }
 
-int listGroups(int numTokens) {
-    if (numTokens != 1) {
+int listGroups(int numTokens)
+{
+    if (numTokens != 1)
+    {
         fprintf(stderr, "[-] Invalid GLS protocol message received.\n");
         return NOK;
     }

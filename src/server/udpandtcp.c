@@ -7,7 +7,8 @@ int errcode, n;
 
 char portDS[PORT_SIZE] = DEFAULT_DSPORT;
 
-void setupDSSockets() {
+void setupDSSockets()
+{
     char hostname[1024];
     // UDP
     fdDSUDP = socket(AF_INET, SOCK_DGRAM, 0);
@@ -21,13 +22,15 @@ void setupDSSockets() {
     hintsUDP.ai_socktype = SOCK_DGRAM;
     hintsUDP.ai_flags = AI_PASSIVE;
     errcode = getaddrinfo(NULL, portDS, &hintsUDP, &resUDP);
-    if (errcode != 0) {
+    if (errcode != 0)
+    {
         perror("[-] Failed on UDP address translation");
         close(fdDSUDP);
         exit(EXIT_FAILURE);
     }
     n = bind(fdDSUDP, resUDP->ai_addr, resUDP->ai_addrlen);
-    if (n == -1) {
+    if (n == -1)
+    {
         perror("[-] Failed to bind UDP server");
         close(fdDSUDP);
         exit(EXIT_FAILURE);
@@ -35,7 +38,8 @@ void setupDSSockets() {
 
     // TCP
     fdListenTCP = socket(AF_INET, SOCK_STREAM, 0);
-    if (fdListenTCP == -1) {
+    if (fdListenTCP == -1)
+    {
         perror("[-] Server TCP socket failed to create");
         closeUDPSocket();
         exit(EXIT_FAILURE);
@@ -45,20 +49,23 @@ void setupDSSockets() {
     hintsTCP.ai_socktype = SOCK_STREAM;
     hintsTCP.ai_flags = AI_PASSIVE;
     errcode = getaddrinfo(NULL, portDS, &hintsTCP, &resTCP);
-    if (errcode != 0) {
+    if (errcode != 0)
+    {
         perror("[-] Failed on TCP address translation");
         closeUDPSocket();
         close(fdListenTCP);
         exit(EXIT_FAILURE);
     }
     n = bind(fdListenTCP, resTCP->ai_addr, resTCP->ai_addrlen);
-    if (n == 1) {
+    if (n == 1)
+    {
         perror("[-] Server TCP socket failed to bind");
         closeUDPSocket();
         closeTCPSocket();
         exit(EXIT_FAILURE);
     }
-    if (listen(fdListenTCP, DEFAULT_LISTENQ) == -1) {
+    if (listen(fdListenTCP, DEFAULT_LISTENQ) == -1)
+    {
         perror("[-] Failed to prepare TCP socket to accept connections");
         closeUDPSocket();
         closeTCPSocket();
@@ -66,15 +73,20 @@ void setupDSSockets() {
     }
 
     gethostname(hostname, 1023);
-    hostname[strlen(hostname)-1] = '\0';
+    hostname[strlen(hostname) - 1] = '\0';
     printf("[+] DS server started at %s.\nCurrently listening in port %s for UDP and TCP connections...\n\n", hostname, portDS);
 
     pid_t pid = fork();
-    if (pid == 0) { // Child process will handle everything related to UDP
+    if (pid == 0)
+    { // Child process will handle everything related to UDP
         handleUDP(fdDSUDP);
-    } else if (pid > 0) { // Parent process will handle everything related to TCP
+    }
+    else if (pid > 0)
+    { // Parent process will handle everything related to TCP
         handleTCP(fdListenTCP);
-    } else {
+    }
+    else
+    {
         perror("[-] Failed on fork");
         exit(EXIT_FAILURE);
     }

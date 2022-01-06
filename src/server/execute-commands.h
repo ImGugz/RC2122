@@ -17,12 +17,14 @@
 #define MAX_GID_SIZE 3
 #define MAX_GNAME_SIZE 25
 
-typedef struct ginfo {
+typedef struct ginfo
+{
     char no[MAX_GID_SIZE];
     char name[MAX_GNAME_SIZE];
 } GROUPINFO;
 
-typedef struct glist {
+typedef struct glist
+{
     GROUPINFO groupinfo[MAX_GROUPS];
     int no_groups;
 } GROUPLIST;
