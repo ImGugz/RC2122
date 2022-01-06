@@ -1,5 +1,7 @@
 #include "execute-commands.h"
 
+GROUPLIST dsGroups;
+
 int userRegister(char **tokenList, int numTokens)
 {
     if (numTokens != 3)
@@ -61,7 +63,7 @@ int userUnregister(char **tokenList, int numTokens)
     };
 
     // Apagar a diretoria do utilizador
-    remove_directory(userDirname);
+    removeDirectory(userDirname);
 
     return OK;
 }
@@ -139,4 +141,12 @@ int userLogout(char **tokenList, int numTokens)
     }
 
     return NOK;
+}
+
+int listGroups(int numTokens) {
+    if (numTokens != 1) {
+        fprintf(stderr, "[-] Invalid GLS protocol message received.\n");
+        return NOK;
+    }
+    return listGroupsDir(&dsGroups);
 }

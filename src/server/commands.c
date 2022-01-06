@@ -38,6 +38,11 @@ char *processClientUDP(char *buf)
     case LOGOUT:
         status = userLogout(tokenList, numTokens);
         response = createStatusMessage("ROU", status);
+        break;
+    case GROUPS_LIST:
+        status = listGroups(numTokens);
+        response = createGroupListMessage(status);
+        break;
     default:
         break;
     }
