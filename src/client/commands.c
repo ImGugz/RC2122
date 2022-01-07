@@ -82,7 +82,7 @@ void processCommands()
             userRetrieveMsgs(tokenList, numTokens);
             break;
 
-        case DEBUG: // TODO: delete
+        case DEBUG: // TODO: DELETE
             userDebug(command);
             break;
         }
