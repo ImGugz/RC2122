@@ -7,13 +7,13 @@ int userRegister(char **tokenList, int numTokens)
     if (numTokens != 3)
     { // wrong protocol message received
         fprintf(stderr, "[-] Incorrect user register command usage.\n");
-        return ERR;
+        return NOK;
     }
 
     if (!(validUID(tokenList[1]) && validPW(tokenList[2])))
     { // wrong protocol message received
         fprintf(stderr, "[-] Invalid register command arguments given.");
-        return ERR;
+        return NOK;
     }
 
     char userDirname[USERDIR_SIZE];
@@ -56,12 +56,12 @@ int userUnregister(char **tokenList, int numTokens)
     if (numTokens != 3)
     { // wrong protocol message received
         fprintf(stderr, "[-] Incorrect user unregister command usage.\n");
-        return ERR;
+        return NOK;
     }
     if (!(validUID(tokenList[1]) && validPW(tokenList[2])))
     { // wrong protocol message received
         fprintf(stderr, "[-] Invalid unregister command arguments given.");
-        return ERR;
+        return NOK;
     }
 
     char userDirname[USERDIR_SIZE];
@@ -92,13 +92,13 @@ int userLogin(char **tokenList, int numTokens)
     if (numTokens != 3)
     { // wrong protocol message received
         fprintf(stderr, "[-] Incorrect user login command usage.\n");
-        return ERR;
+        return NOK;
     }
 
     if (!(validUID(tokenList[1]) && validPW(tokenList[2])))
     { // wrong protocol message received
         fprintf(stderr, "[-] Invalid login command arguments given.");
-        return ERR;
+        return NOK;
     }
 
     char userDirname[USERDIR_SIZE];
@@ -145,7 +145,7 @@ int userLogout(char **tokenList, int numTokens)
     if (!(validUID(tokenList[1]) && validPW(tokenList[2])))
     { // wrong protocol message received
         fprintf(stderr, "[-] Invalid login command arguments given.");
-        return ERR;
+        return NOK;
     }
 
     char userDirname[USERDIR_SIZE];
@@ -182,7 +182,7 @@ int listGroups(int numTokens)
     if (numTokens != 1)
     { // wrong protocol message received
         fprintf(stderr, "[-] Invalid GLS protocol message received.\n");
-        return ERR;
+        return NOK;
     }
     return dsGroups.no_groups;
 }
@@ -192,12 +192,12 @@ int userSubscribe(char **tokenList, int numTokens, char **newGID)
     if (numTokens != 4)
     { // wrong protocol message received
         fprintf(stderr, "[-] Incorrect user subscribe command usage.\n");
-        return ERR;
+        return NOK;
     }
     if (!(validUID(tokenList[1]) && isGID(tokenList[2]) && validGName(tokenList[3])))
     { // wrong protocol message received
         fprintf(stderr, "[-] Invalid user subscribe command arguments.\n");
-        return ERR;
+        return NOK;
     }
 
     char userDirname[USERDIR_SIZE];
@@ -363,13 +363,13 @@ int userUnsubscribe(char **tokenList, int numTokens)
     if (numTokens != 3)
     { // wrong protocol message received
         fprintf(stderr, "[-] Incorrect user subscribe command usage.\n");
-        return ERR;
+        return NOK;
     }
 
     if (!(validUID(tokenList[1]) && validGID(tokenList[2])))
     { // wrong protocol message received
         fprintf(stderr, "[-] Invalid unsubscribe command arguments given.\n");
-        return ERR;
+        return NOK;
     }
 
     char userDirname[USERDIR_SIZE];
