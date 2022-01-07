@@ -34,5 +34,6 @@ void showSelectedGroup(int numTokens);
 void showUsersGroup(int numTokens);
 void userPostGroup(char *command);
 void userRetrieveMsgs(char **tokenList, int numTokens);
+void userDebug(char *command);
 
 #endif

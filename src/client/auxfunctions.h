@@ -34,6 +34,8 @@
 #define SHOW_SELECTED 14
 #define SHOW_USER 15
 
+#define DEBUG 16 // TODO: DELETE
+
 int validUID(char *UID);
 int validPW(char *PW);
 int validGID(char *GID);

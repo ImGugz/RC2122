@@ -303,6 +303,9 @@ int parseUserCommand(char *command)
         return GROUP_POST;
     else if ((strcmp(command, "retrieve") == 0) || (strcmp(command, "r") == 0))
         return GROUP_RETRIEVE;
+
+    else if (strcmp(command, "debug") == 0) // TODO: DELETE
+        return DEBUG;
     else
     {
         fprintf(stderr, "[-] Invalid user command code. Please try again.\n");

@@ -81,6 +81,10 @@ void processCommands()
         case GROUP_RETRIEVE:
             userRetrieveMsgs(tokenList, numTokens);
             break;
+
+        case DEBUG: // TODO: delete
+            userDebug(command);
+            break;
         }
     }
 }

@@ -438,3 +438,35 @@ void userRetrieveMsgs(char **tokenList, int numTokens)
     sprintf(serverMessage, "RTV %s %s %s\n", activeUser, activeGID, tokenList[1]);
     exchangeTCPRet(serverMessage);
 }
+
+void userDebug(char *command)
+{
+    char debugCmd[4096], tmp[4096];
+    int numTokens = 0;
+    char *tokenList[2048];
+    sscanf(command, "debug \"%254[^\"]\"", debugCmd);
+    size_t lenDebug = strlen(debugCmd);
+    debugCmd[lenDebug] = '\n';
+    debugCmd[lenDebug + 1] = '\0';
+    strcpy(tmp, debugCmd);
+    char *token = strtok(tmp, " \n");
+    while (token != NULL)
+    {
+        tokenList[numTokens] = token;
+        numTokens++;
+        token = strtok(NULL, " \n");
+    }
+    if (!strcmp(tokenList[0], "REG") || !strcmp(tokenList[0], "UNR") || !strcmp(tokenList[0], "LOG") || !strcmp(tokenList[0], "OUT") ||
+        !strcmp(tokenList[0], "GLS") || !strcmp(tokenList[0], "GSR") || !strcmp(tokenList[0], "GUR") || !strcmp(tokenList[0], "GLM"))
+    {
+        exchangeUDPMsg(debugCmd);
+    }
+    else if (!strcmp(tokenList[0], "ULS") || !strcmp(tokenList[0], "PST") || !strcmp(tokenList[0], "RTV"))
+    {
+        exchangeTCPMsg(debugCmd);
+    }
+    else
+    {
+        printf("[-] Mete uma mensagem de protocolo a sério caralho.\n");
+    }
+}
