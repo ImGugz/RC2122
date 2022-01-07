@@ -30,6 +30,7 @@
 #define GROUPUSERSUBFILE_SIZE 20
 #define PATHPWLOGIN_SIZE 32
 #define USERPW_SIZE 8
+#define GROUPNAME_SIZE 26
 
 #define ERR_MSG "ERR\n"
 

@@ -244,6 +244,7 @@ int userSubscribe(char **tokenList, int numTokens, char **newGID)
         char msgDirName[GROUPMSGDIR_SIZE];
         char groupNameFile[GROUPNAMEFILE_SIZE];
         char userSubscribedFile[GROUPUSERSUBFILE_SIZE];
+        char groupNameBuffer[GROUPNAME_SIZE];
 
         // Create group directory
         sprintf(groupDirName, "GROUPS/%s", *newGID);
@@ -278,8 +279,9 @@ int userSubscribe(char **tokenList, int numTokens, char **newGID)
             *newGID = NULL;
             return NOK;
         }
-        size_t lenGroupName = strlen(tokenList[3]);
-        if (fwrite(tokenList[3], sizeof(char), lenGroupName, fPtr) != lenGroupName)
+        sprintf(groupNameBuffer, "%s\n", tokenList[3]);
+        size_t lenGroupName = strlen(groupNameBuffer);
+        if (fwrite(groupNameBuffer, sizeof(char), lenGroupName, fPtr) != lenGroupName)
         {
             fprintf(stderr, "[-] Failed to write group name on group name file.\n");
             free(*newGID);
@@ -313,9 +315,10 @@ int userSubscribe(char **tokenList, int numTokens, char **newGID)
         }
 
         // Add new group to global groups struct
+        int n = dsGroups.no_groups;
         dsGroups.no_groups++;
-        strcpy(dsGroups.groupinfo[dsGroups.no_groups].name, tokenList[3]);
-        sprintf(dsGroups.groupinfo[dsGroups.no_groups].no, "%d", dsGroups.no_groups);
+        strcpy(dsGroups.groupinfo[n].name, tokenList[3]);
+        sprintf(dsGroups.groupinfo[n].no, "%s", *newGID);
         return NEW;
     }
 

@@ -84,7 +84,7 @@ void handleUDP(int clientSocket)
         n = recvfrom(clientSocket, clientBuf, sizeof(clientBuf), 0, (struct sockaddr *)&cliaddr, &addrlen);
         if (n == -1)
         {
-            perror("[-] Server UDP failed on recvfrom");
+            perror("[-] Server UDP failed on read");
             closeUDPSocket();
             exit(EXIT_FAILURE);
         }
@@ -123,20 +123,24 @@ void handleTCP(int listenSocket)
             perror("[-] Server TCP failed to accept new connection");
             exit(EXIT_FAILURE);
         }
-        if (timerOn(newTCPfd) < 0)
-        {
-            perror("[-] Setsockopt on server TCP has failed");
-            exit(EXIT_FAILURE);
-        }
         if ((pid = fork()) == 0)
         {
             close(listenSocket);
             bzero(clientBuf, sizeof(clientBuf));
+
             n = read(newTCPfd, clientBuf, sizeof(clientBuf));
             if (n == -1)
             {
-                perror("[-] Server TCP failed on read");
-                exit(EXIT_FAILURE);
+                if (errno == EAGAIN || errno == EWOULDBLOCK)
+                {
+                    perror("[-] Server UDP timeout has been reached");
+                }
+                else
+                {
+                    perror("[-] Server TCP failed on read");
+                }
+                close(newTCPfd);
+                break;
             }
             clientBuf[n - 1] = '\0';
             write(1, "Client: ", 8);
