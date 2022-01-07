@@ -17,6 +17,8 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include "execute-commands.h"
 
 #define DEFAULT_DSADDR "127.0.0.1" // localhost

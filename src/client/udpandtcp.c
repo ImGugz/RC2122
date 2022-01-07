@@ -395,6 +395,7 @@ void exchangeUDPMsg(char *message)
         exit(EXIT_FAILURE);
     }
     recvBuffer[nUDP] = '\0'; // will never SIGSEGV
+    printf("[!] Server @ %s in port %d sent: %s", inet_ntoa(addrUDP.sin_addr), ntohs(addrUDP.sin_port), recvBuffer);
     processUDPMsg(recvBuffer);
 }
 
