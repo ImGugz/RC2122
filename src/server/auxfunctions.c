@@ -125,6 +125,11 @@ int validRegex(char *buf, char *reg)
     return 1;
 }
 
+void logVerbose(char *clientBuf, struct sockaddr_in s)
+{
+    printf("[!] Client @ %s in port %d sent: %s", inet_ntoa(s.sin_addr), ntohs(s.sin_port), clientBuf);
+}
+
 int parseUserCommandUDP(char *command)
 {
     if (strcmp(command, "REG") == 0)
@@ -157,7 +162,7 @@ char *createStatusMessage(char *command, int statusCode)
     switch (statusCode)
     {
     case ERR:
-        sprintf(status, "ERR\n");
+        sprintf(status, ERR_MSG);
         break;
     case OK:
         sprintf(status, "%s %s", command, "OK\n");
@@ -397,21 +402,23 @@ void fillGroupsInfo()
     }
 }
 
-char *createGroupListMessage()
+char *createGroupListMessage(char *code, int *groups, int num)
 {
     char listGroups[MAX_SENDUDP_SIZE] = "";
     char *ptr = listGroups;
-    int numGroups = dsGroups.no_groups;
+    int numGroups = (groups == NULL) ? dsGroups.no_groups : num;
     sortGList((&dsGroups));
-    ptr += sprintf(ptr, "RGL %d", numGroups);
+    ptr += sprintf(ptr, "%s %d", code, numGroups);
     if (numGroups > 0)
     {
         struct dirent **d;
         int n, flag;
+        int j;
         char groupPath[MAX_GNAME_SIZE];
         for (int i = 0; i < numGroups; ++i)
         {
-            sprintf(groupPath, "GROUPS/%s/MSG", dsGroups.groupinfo[i].no);
+            j = (groups == NULL) ? i : groups[i];
+            sprintf(groupPath, "GROUPS/%s/MSG", dsGroups.groupinfo[j].no);
             n = scandir(groupPath, &d, 0, alphasort);
             if (n < 0)
             {
@@ -426,7 +433,7 @@ char *createGroupListMessage()
                     {
                         if (validMID(d[n]->d_name))
                         { // Check for garbage
-                            ptr += sprintf(ptr, " %s %s %s", dsGroups.groupinfo[i].no, dsGroups.groupinfo[i].name, d[n]->d_name);
+                            ptr += sprintf(ptr, " %s %s %s", dsGroups.groupinfo[j].no, dsGroups.groupinfo[j].name, d[n]->d_name);
                             flag = 1;
                         }
                     }
@@ -435,7 +442,7 @@ char *createGroupListMessage()
                 free(d);
                 if (!flag)
                 { // No messages are in the group
-                    ptr += sprintf(ptr, " %s %s 0000", dsGroups.groupinfo[i].no, dsGroups.groupinfo[i].name);
+                    ptr += sprintf(ptr, " %s %s 0000", dsGroups.groupinfo[j].no, dsGroups.groupinfo[j].name);
                 }
             }
         }
@@ -444,6 +451,54 @@ char *createGroupListMessage()
     return strdup(listGroups);
 }
 
+int compareGIDs(const void *a, const void *b)
+{
+    return *(int *)a - *(int *)b;
+}
+
+char *createUserGroupsMessage(char **tokenList, int numTokens)
+{
+    if (numTokens != 2)
+    { // wrong protocol message received
+        fprintf(stderr, "[-] Invalid GLM message received.\n");
+        return strdup(ERR_MSG);
+    }
+    if (!(validUID(tokenList[1])))
+    { // wrong protocol message received
+        fprintf(stderr, "[-] Invalid GLM arguments received.\n");
+        return strdup(ERR_MSG);
+    }
+    DIR *d;
+    struct dirent *dir;
+    char userSubscribeFile[DIRNAME_SIZE];
+    int groupsSubscribed[MAX_GROUPS];
+    int numGroupsSub = 0;
+    d = opendir("GROUPS");
+    if (d)
+    {
+        while ((dir = readdir(d)) != NULL)
+        {
+            if (!strcmp(dir->d_name, ".") || !strcmp(dir->d_name, ".."))
+            {
+                continue;
+            }
+            if (strlen(dir->d_name) != 2)
+            {
+                continue;
+            }
+            sprintf(userSubscribeFile, "GROUPS/%s/%s.txt", dir->d_name, tokenList[1]);
+            if (!access(userSubscribeFile, F_OK))
+            { // user is subscribed to this group - save its index
+                groupsSubscribed[numGroupsSub++] = atoi(dir->d_name) - 1;
+            }
+        }
+    }
+    if (numGroupsSub > 0)
+    { // sort group index's
+        qsort(groupsSubscribed, numGroupsSub, sizeof(int), compareGIDs);
+    }
+    return createGroupListMessage("RGM", groupsSubscribed, numGroupsSub);
+}
 int validGName(char *gName)
 {
     return validRegex(gName, "^[a-zA-Z0-9_-]{1,24}$");

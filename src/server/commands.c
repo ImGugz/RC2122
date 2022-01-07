@@ -12,7 +12,7 @@ char *processClientUDP(char *buf)
     char *response, *newGID = NULL;
     if (buf[strlen(buf) - 1] != '\n')
     { // all protocol messages exchanged must end with a \n
-        return "ERR\n";
+        return strdup(ERR_MSG);
     }
     strtok(buf, "\n");
     strcpy(tmp, buf);
@@ -25,7 +25,7 @@ char *processClientUDP(char *buf)
     op = parseUserCommandUDP(tokenList[0]);
     if (op == INVALID_COMMAND)
     { // invalid protocol message received
-        return "ERR\n";
+        return strdup(ERR_MSG);
     }
     switch (op)
     {
@@ -46,7 +46,7 @@ char *processClientUDP(char *buf)
         response = createStatusMessage("ROU", status);
         break;
     case GROUPS_LIST:
-        response = createGroupListMessage();
+        response = createGroupListMessage("RGL", NULL, 0);
         break;
     case SUBSCRIBE:
         status = userSubscribe(tokenList, numTokens, &newGID);
@@ -55,6 +55,9 @@ char *processClientUDP(char *buf)
     case UNSUBSCRIBE:
         status = userUnsubscribe(tokenList, numTokens);
         response = createStatusMessage("RGU", status);
+        break;
+    case USER_GROUPS:
+        response = createUserGroupsMessage(tokenList, numTokens);
         break;
     default:
         break;
@@ -86,6 +89,10 @@ void handleUDP(int clientSocket)
             exit(EXIT_FAILURE);
         }
         clientBuf[n] = '\0';
+        if (verbose)
+        {
+            logVerbose(clientBuf, cliaddr);
+        }
         serverBuf = processClientUDP(clientBuf);
         n = sendto(clientSocket, serverBuf, strlen(serverBuf) + 1, 0, (struct sockaddr *)&cliaddr, addrlen);
         if (n == -1)
