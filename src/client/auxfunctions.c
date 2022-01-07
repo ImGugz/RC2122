@@ -135,13 +135,14 @@ int validMID(char *MID)
  */
 void parseArgs(int argc, char *argv[])
 {
-    char addrDS[ADDR_SIZE] = DEFAULT_DSADDR, portDS[PORT_SIZE] = DEFAULT_DSPORT;
     char c;
     if (argc != 1 && argc != 3 && argc != 5)
     {
         fprintf(stderr, "[-] Invalid input. Please try again.\n");
         exit(EXIT_FAILURE);
     }
+    strcpy(addrDS, DEFAULT_DSADDR);
+    strcpy(portDS, DEFAULT_DSPORT);
     while ((c = getopt(argc, argv, ":n:p:")) != -1)
     {
         switch (c)
@@ -183,7 +184,6 @@ void parseArgs(int argc, char *argv[])
             exit(EXIT_FAILURE);
         }
     }
-    setAddrPortDS(addrDS, portDS);
     createUDPSocket();
 }
 
@@ -426,6 +426,8 @@ int readTCP(char *message, int maxSize, int flag)
     while (bytesRecv < maxSize)
     {
         n = recv(fdDSTCP, message + bytesRecv, maxSize - bytesRecv, 0);
+        if (n == 0)
+            break; // Peer has performed an orderly shutdown -> message complete
         if (n == -1)
         {
             perror("[-] Failed to receive from server on TCP");
@@ -433,8 +435,6 @@ int readTCP(char *message, int maxSize, int flag)
             closeTCPSocket();
             return n;
         }
-        if (n == 0)
-            break; // Peer has performed an orderly shutdown -> message complete
         bytesRecv += n;
     }
     return bytesRecv;

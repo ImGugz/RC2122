@@ -177,14 +177,53 @@ int userLogout(char **tokenList, int numTokens)
     return NOK;
 }
 
-int listGroups(int numTokens)
+char *createGroupListMessage(char *code, int *groups, int num)
 {
-    if (numTokens != 1)
-    { // wrong protocol message received
-        fprintf(stderr, "[-] Invalid GLS protocol message received.\n");
-        return ERR;
+    char listGroups[MAX_SENDUDP_SIZE] = "";
+    char *ptr = listGroups;
+    int numGroups = (groups == NULL) ? dsGroups.no_groups : num;
+    sortGList((&dsGroups));
+    ptr += sprintf(ptr, "%s %d", code, numGroups);
+    if (numGroups > 0)
+    {
+        struct dirent **d;
+        int n, flag;
+        int j;
+        char groupPath[MAX_GNAME_SIZE];
+        for (int i = 0; i < numGroups; ++i)
+        {
+            j = (groups == NULL) ? i : groups[i];
+            sprintf(groupPath, "GROUPS/%s/MSG", dsGroups.groupinfo[j].no);
+            n = scandir(groupPath, &d, 0, alphasort);
+            if (n < 0)
+            {
+                perror("[-] scandir on grouppath");
+            }
+            else
+            {
+                flag = 0;
+                while (n--)
+                {
+                    if (!flag)
+                    {
+                        if (validMID(d[n]->d_name))
+                        { // Check for garbage
+                            ptr += sprintf(ptr, " %s %s %s", dsGroups.groupinfo[j].no, dsGroups.groupinfo[j].name, d[n]->d_name);
+                            flag = 1;
+                        }
+                    }
+                    free(d[n]);
+                }
+                free(d);
+                if (!flag)
+                { // No messages are in the group
+                    ptr += sprintf(ptr, " %s %s 0000", dsGroups.groupinfo[j].no, dsGroups.groupinfo[j].name);
+                }
+            }
+        }
     }
-    return dsGroups.no_groups;
+    ptr += sprintf(ptr, "\n");
+    return strdup(listGroups);
 }
 
 int userSubscribe(char **tokenList, int numTokens, char **newGID)
@@ -279,7 +318,7 @@ int userSubscribe(char **tokenList, int numTokens, char **newGID)
             *newGID = NULL;
             return NOK;
         }
-        sprintf(groupNameBuffer, "%s\n", tokenList[3]);
+        sprintf(groupNameBuffer, "%s\n", tokenList[3]); // the groups in the given DS files had a \n after their name so we replicate behaviour
         size_t lenGroupName = strlen(groupNameBuffer);
         if (fwrite(groupNameBuffer, sizeof(char), lenGroupName, fPtr) != lenGroupName)
         {
@@ -316,9 +355,9 @@ int userSubscribe(char **tokenList, int numTokens, char **newGID)
 
         // Add new group to global groups struct
         int n = dsGroups.no_groups;
-        dsGroups.no_groups++;
         strcpy(dsGroups.groupinfo[n].name, tokenList[3]);
         sprintf(dsGroups.groupinfo[n].no, "%s", *newGID);
+        dsGroups.no_groups++;
         return NEW;
     }
 
@@ -405,4 +444,119 @@ int userUnsubscribe(char **tokenList, int numTokens)
         return NOK;
     }
     return OK;
+}
+
+char *createUserGroupsMessage(char **tokenList, int numTokens)
+{
+    if (numTokens != 2)
+    { // wrong protocol message received
+        fprintf(stderr, "[-] Invalid GLM message received.\n");
+        return strdup(ERR_MSG);
+    }
+    if (!(validUID(tokenList[1])))
+    { // wrong protocol message received
+        fprintf(stderr, "[-] Invalid GLM arguments received.\n");
+        return strdup(ERR_MSG);
+    }
+    DIR *d;
+    struct dirent *dir;
+    char userSubscribeFile[DIRNAME_SIZE];
+    int groupsSubscribed[MAX_GROUPS];
+    int numGroupsSub = 0;
+    d = opendir("GROUPS");
+    if (d)
+    {
+        while ((dir = readdir(d)) != NULL)
+        {
+            if (!strcmp(dir->d_name, ".") || !strcmp(dir->d_name, ".."))
+            {
+                continue;
+            }
+            if (strlen(dir->d_name) != 2)
+            {
+                continue;
+            }
+            sprintf(userSubscribeFile, "GROUPS/%s/%s.txt", dir->d_name, tokenList[1]);
+            if (!access(userSubscribeFile, F_OK))
+            { // user is subscribed to this group - save its index
+                groupsSubscribed[numGroupsSub++] = atoi(dir->d_name) - 1;
+            }
+        }
+    }
+    if (numGroupsSub > 0)
+    { // sort group index's
+        qsort(groupsSubscribed, numGroupsSub, sizeof(int), compareIDs);
+    }
+    return createGroupListMessage("RGM", groupsSubscribed, numGroupsSub);
+}
+
+char *createUsersInGroupMessage(char **tokenList, int numTokens)
+{
+    if (numTokens != 2)
+    { // server at tejo exits
+        fprintf(stderr, "[-] Invalid ULS message received");
+        return strdup(ERR_MSG);
+    }
+    if (!validGID(tokenList[1]))
+    { // server at tejo exits
+        fprintf(stderr, "[-] Invalid ULS arguments receibed.\n");
+        return strdup("RUL NOK\n");
+    }
+    sortGList((&dsGroups));
+    char *users, *tmp;
+    int len = 0, curr = 0;
+    int groupNum = atoi(tokenList[1]);
+    if (groupNum > dsGroups.no_groups)
+    { // group doesn't exist - tejo returns NOK
+        return strdup("RUL NOK\n");
+    }
+    char groupDirName[GROUPDIR_SIZE];
+    sprintf(groupDirName, "GROUPS/%s", tokenList[1]);
+    DIR *d;
+    d = opendir(groupDirName);
+    if (d)
+    {
+        struct dirent *dir;
+        char UIDtxt[MAX_UID_SIZE];
+        tmp = (char *)calloc(sizeof(char), INITIAL_ULBUF_SIZE + 1); // 10 users
+        if (!tmp)
+        {
+            fprintf(stderr, "[-] Failed on calloc ULS.\n");
+            return strdup("RUL NOK\n");
+        }
+        users = tmp;
+        len = INITIAL_ULBUF_SIZE;
+        curr += sprintf(users + curr, "RUL OK %s ", tokenList[1]);
+        while ((dir = readdir(d)) != NULL)
+        {
+            if (!strcmp(dir->d_name, ".") || !strcmp(dir->d_name, ".."))
+            {
+                continue;
+            }
+            if (strlen(dir->d_name) < 9) // UID + 1 + 3
+            {
+                continue;
+            }
+            strncpy(UIDtxt, dir->d_name, MAX_UID_SIZE - 1);
+            UIDtxt[MAX_UID_SIZE - 1] = '\0';
+            if (validUID(UIDtxt))
+            {
+                if (curr + MAX_UID_SIZE >= len)
+                {
+                    char *newPtr = (char *)realloc(users, len + 6 * 10); // 10 more users
+                    if (newPtr == NULL)
+                    {
+                        fprintf(stderr, "[-] Failed on realloc ULS.\n");
+                        free(users);
+                        return strdup("RUL NOK\n");
+                    }
+                    users = newPtr;
+                    len += MAX_UID_SIZE * 10;
+                }
+                curr += sprintf(users + curr, "%s ", UIDtxt);
+            }
+        }
+    }
+    curr += sprintf(users + curr, "\n");
+    return users;
 }

@@ -301,19 +301,6 @@ void processTCPMsg(char *buffer, int *flag)
 }
 
 /**
- * @brief Set the given address/port to use in UDP/TCP protocols.
- *
- * @param addr domain name/address (string/NULL).
- * @param port port number (string/NULL).
- */
-void setAddrPortDS(char *addr, char *port)
-{
-    // Validation was already made - safe strcpies
-    strcpy(addrDS, addr);
-    strcpy(portDS, port);
-}
-
-/**
  * @brief Create client's UDP socket.
  *
  */

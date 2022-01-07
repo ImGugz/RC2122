@@ -7,7 +7,7 @@ CFLAGS = -g -o -Wall
 
 all: DS
 
-DS: udpandtcp.o auxfunctions.o commands.o execute-commands.o main.o
+DS: udpandtcp.o execute-commands.o auxfunctions.o commands.o main.o
 	$(CC) $(CFLAGS) -o DS udpandtcp.o auxfunctions.o commands.o execute-commands.o main.o
 
 main.o: main.c execute-commands.h auxfunctions.h
@@ -22,7 +22,7 @@ execute-commands.o: execute-commands.c execute-commands.h udpandtcp.h auxfunctio
 auxfunctions.o: auxfunctions.c auxfunctions.h udpandtcp.h
 	$(CC) $(CFLAGS) -o auxfunctions.o -c auxfunctions.c
 
-udpandtcp.o: udpandtcp.c udpandtcp.h execute-commands.h
+udpandtcp.o: udpandtcp.c udpandtcp.h commands.h
 	$(CC) $(CFLAGS) -o udpandtcp.o -c udpandtcp.c
 
 clean:

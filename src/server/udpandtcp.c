@@ -75,7 +75,7 @@ void setupDSSockets()
     }
 
     gethostname(hostname, HOSTNAME_SIZE);
-    printf("[+] DS server started at %s.\n[!] Currently listening in port %s for UDP and TCP connections...\n\n", hostname, portDS);
+    printf("[+] DS server started @ %s.\n[!] Currently listening in port %s for UDP and TCP connections...\n\n", hostname, portDS);
     fillGroupsInfo(); // fill global struct with already existing groups
     pid_t pid = fork();
     if (pid == 0)

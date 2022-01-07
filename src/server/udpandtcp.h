@@ -25,7 +25,7 @@
 #define ADDR_SIZE 64               // maxlen(domain names) + 1
 #define PORT_SIZE 6                // len(65535) + 1
 #define DEFAULT_LISTENQ 10
-#define DEFAULT_TIMEOUT 300
+#define DEFAULT_TIMEOUT 15
 
 extern int verbose;
 extern char portDS[PORT_SIZE];

@@ -8,7 +8,7 @@
 
 #define MAX_RECVUDP_SIZE 40 // actually it's 39 from GSR (including null terminator)
 #define MAX_SENDUDP_SIZE 4096
-#define MAX_RECVTCP_SIZE 260 // actually it's 258 from PST (with no file)
+#define MAX_RECVTCP_SIZE 259 // PST with no FILE
 
 void handleUDP(int clientSocket);
 void handleTCP(int listenSocket);

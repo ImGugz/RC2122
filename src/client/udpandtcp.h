@@ -27,9 +27,10 @@
 #define PORT_SIZE 6                // len(65535) + 1
 
 extern int fdDSTCP; // File descriptor for TCP socket to be used in auxiliary functions
+extern char addrDS[ADDR_SIZE];
+extern char portDS[PORT_SIZE];
 
 // Setup functions
-void setAddrPortDS(char *addr, char *port);
 void createUDPSocket();
 
 // UDP related functions

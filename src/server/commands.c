@@ -3,7 +3,7 @@
 #define CMDBUF_SIZE 512
 #define MAX_NUM_TOKENS 4
 
-char *processClientUDP(char *buf)
+char *processClient(char *buf)
 {
     char *token, *tokenList[MAX_NUM_TOKENS];
     char tmp[CMDBUF_SIZE];
@@ -22,7 +22,7 @@ char *processClientUDP(char *buf)
         tokenList[numTokens++] = token;
         token = strtok(NULL, " \n");
     }
-    op = parseUserCommandUDP(tokenList[0]);
+    op = parseUserCommand(tokenList[0]);
     if (op == INVALID_COMMAND)
     { // invalid protocol message received
         return strdup(ERR_MSG);
@@ -59,16 +59,12 @@ char *processClientUDP(char *buf)
     case USER_GROUPS:
         response = createUserGroupsMessage(tokenList, numTokens);
         break;
-    default:
+    case USERS_LIST:
+        response = createUsersInGroupMessage(tokenList, numTokens);
         break;
     }
 
     return response;
-}
-
-char *processClientTCP(char *buf)
-{
-    return NULL;
 }
 
 void handleUDP(int clientSocket)
@@ -93,7 +89,7 @@ void handleUDP(int clientSocket)
         {
             logVerbose(clientBuf, cliaddr);
         }
-        serverBuf = processClientUDP(clientBuf);
+        serverBuf = processClient(clientBuf);
         n = sendto(clientSocket, serverBuf, strlen(serverBuf) + 1, 0, (struct sockaddr *)&cliaddr, addrlen);
         if (n == -1)
         {
@@ -108,7 +104,6 @@ void handleUDP(int clientSocket)
 void handleTCP(int listenSocket)
 {
     char clientBuf[MAX_RECVTCP_SIZE] = "";
-    char *servBuf;
     struct sockaddr_in cliaddr;
     socklen_t addrlen;
     ssize_t n;
@@ -121,35 +116,48 @@ void handleTCP(int listenSocket)
         if ((newTCPfd = accept(listenSocket, (struct sockaddr *)&cliaddr, &addrlen)) == -1)
         {
             perror("[-] Server TCP failed to accept new connection");
-            exit(EXIT_FAILURE);
+            continue;
         }
         if ((pid = fork()) == 0)
         {
             close(listenSocket);
-            bzero(clientBuf, sizeof(clientBuf));
-
-            n = read(newTCPfd, clientBuf, sizeof(clientBuf));
-            if (n == -1)
+            memset(clientBuf, 0, sizeof(clientBuf));
+            if (timerOn(newTCPfd) == -1)
             {
-                if (errno == EAGAIN || errno == EWOULDBLOCK)
-                {
-                    perror("[-] Server UDP timeout has been reached");
-                }
-                else
-                {
-                    perror("[-] Server TCP failed on read");
-                }
+                perror("[-] Failed to start TCP timer");
                 close(newTCPfd);
                 break;
             }
-            clientBuf[n - 1] = '\0';
-            write(1, "Client: ", 8);
-            write(1, clientBuf, n);
-            servBuf = processClientTCP(clientBuf);
+            n = readTCP(newTCPfd, clientBuf, MAX_RECVTCP_SIZE - 1, 0);
+            if (n == -1)
+            {
+                if (!(errno == EAGAIN || errno == EWOULDBLOCK))
+                {
+                    perror("[-] Server TCP failed on read");
+                    close(newTCPfd);
+                    exit(EXIT_FAILURE);
+                }
+                else
+                {
+                    fprintf(stderr, "[-] TCP timeout on receive has been reached.\n");
+                    char errMSG[5];
+                    strcpy(errMSG, "ERR\n");
+                    write(newTCPfd, errMSG, strlen(errMSG) + 1);
+                    close(newTCPfd);
+                    exit(EXIT_FAILURE);
+                }
+            }
+            clientBuf[n] = '\0';
+            if (verbose)
+            {
+                logVerbose(clientBuf, cliaddr);
+            }
+            serverBuf = processClient(clientBuf);
             n = write(newTCPfd, serverBuf, strlen(serverBuf) + 1);
             if (n == -1)
             {
                 perror("[-] Server UDP failed on sendto");
+                close(newTCPfd);
                 exit(EXIT_FAILURE);
             }
             close(newTCPfd);

@@ -1,7 +1,5 @@
 #include "auxfunctions.h"
 
-#define DIRNAME_SIZE 530
-
 /**
  * @brief Checks if a given user ID is valid according to the statement's rules.
  *
@@ -130,7 +128,7 @@ void logVerbose(char *clientBuf, struct sockaddr_in s)
     printf("[!] Client @ %s in port %d sent: %s", inet_ntoa(s.sin_addr), ntohs(s.sin_port), clientBuf);
 }
 
-int parseUserCommandUDP(char *command)
+int parseUserCommand(char *command)
 {
     if (strcmp(command, "REG") == 0)
         return REGISTER;
@@ -148,6 +146,8 @@ int parseUserCommandUDP(char *command)
         return UNSUBSCRIBE;
     else if (strcmp(command, "GLM") == 0)
         return USER_GROUPS;
+    else if (strcmp(command, "ULS") == 0)
+        return USERS_LIST;
     else
     {
         fprintf(stderr, "[-] Invalid protocol command code received. Please try again.\n");
@@ -402,106 +402,60 @@ void fillGroupsInfo()
     }
 }
 
-char *createGroupListMessage(char *code, int *groups, int num)
-{
-    char listGroups[MAX_SENDUDP_SIZE] = "";
-    char *ptr = listGroups;
-    int numGroups = (groups == NULL) ? dsGroups.no_groups : num;
-    sortGList((&dsGroups));
-    ptr += sprintf(ptr, "%s %d", code, numGroups);
-    if (numGroups > 0)
-    {
-        struct dirent **d;
-        int n, flag;
-        int j;
-        char groupPath[MAX_GNAME_SIZE];
-        for (int i = 0; i < numGroups; ++i)
-        {
-            j = (groups == NULL) ? i : groups[i];
-            sprintf(groupPath, "GROUPS/%s/MSG", dsGroups.groupinfo[j].no);
-            n = scandir(groupPath, &d, 0, alphasort);
-            if (n < 0)
-            {
-                perror("[-] scandir on grouppath");
-            }
-            else
-            {
-                flag = 0;
-                while (n--)
-                {
-                    if (!flag)
-                    {
-                        if (validMID(d[n]->d_name))
-                        { // Check for garbage
-                            ptr += sprintf(ptr, " %s %s %s", dsGroups.groupinfo[j].no, dsGroups.groupinfo[j].name, d[n]->d_name);
-                            flag = 1;
-                        }
-                    }
-                    free(d[n]);
-                }
-                free(d);
-                if (!flag)
-                { // No messages are in the group
-                    ptr += sprintf(ptr, " %s %s 0000", dsGroups.groupinfo[j].no, dsGroups.groupinfo[j].name);
-                }
-            }
-        }
-    }
-    ptr += sprintf(ptr, "\n");
-    return strdup(listGroups);
-}
-
-int compareGIDs(const void *a, const void *b)
+int compareIDs(const void *a, const void *b)
 {
     return *(int *)a - *(int *)b;
 }
 
-char *createUserGroupsMessage(char **tokenList, int numTokens)
-{
-    if (numTokens != 2)
-    { // wrong protocol message received
-        fprintf(stderr, "[-] Invalid GLM message received.\n");
-        return strdup(ERR_MSG);
-    }
-    if (!(validUID(tokenList[1])))
-    { // wrong protocol message received
-        fprintf(stderr, "[-] Invalid GLM arguments received.\n");
-        return strdup(ERR_MSG);
-    }
-    DIR *d;
-    struct dirent *dir;
-    char userSubscribeFile[DIRNAME_SIZE];
-    int groupsSubscribed[MAX_GROUPS];
-    int numGroupsSub = 0;
-    d = opendir("GROUPS");
-    if (d)
-    {
-        while ((dir = readdir(d)) != NULL)
-        {
-            if (!strcmp(dir->d_name, ".") || !strcmp(dir->d_name, ".."))
-            {
-                continue;
-            }
-            if (strlen(dir->d_name) != 2)
-            {
-                continue;
-            }
-            sprintf(userSubscribeFile, "GROUPS/%s/%s.txt", dir->d_name, tokenList[1]);
-            if (!access(userSubscribeFile, F_OK))
-            { // user is subscribed to this group - save its index
-                groupsSubscribed[numGroupsSub++] = atoi(dir->d_name) - 1;
-            }
-        }
-    }
-    if (numGroupsSub > 0)
-    { // sort group index's
-        qsort(groupsSubscribed, numGroupsSub, sizeof(int), compareGIDs);
-    }
-    return createGroupListMessage("RGM", groupsSubscribed, numGroupsSub);
-}
 int validGName(char *gName)
 {
     return validRegex(gName, "^[a-zA-Z0-9_-]{1,24}$");
+}
+
+/**
+ * @brief Reads at most maxSize bytes of given message with a given flag
+ *
+ * @param message buffer to store message read
+ * @param maxSize max number of bytes to be read
+ * @param flag 0 or MSG_PEEK
+ * @return -1 if recv failed or N > 0 corresponding to the number of bytes received
+ */
+int readTCP(int fd, char *message, int maxSize, int flag)
+{
+    int bytesRecv = 0;
+    ssize_t n;
+    if (flag == MSG_PEEK)
+    { // We assume that recv can get at least offset bytes (usually really low -> reliable)
+        n = recv(fd, message, maxSize, MSG_PEEK);
+        if (n == -1)
+        {
+            perror("[-] Failed to receive from server on TCP");
+            closeUDPSocket();
+            closeTCPSocket();
+        }
+        return n;
+    }
+    while (bytesRecv < maxSize)
+    {
+        n = recv(fd, message + bytesRecv, maxSize - bytesRecv, 0);
+        int d = (message[n] == '\0') ? 1 : 0;
+        int e = (message[n - 1] == '\n') ? 1 : 0;
+        if (n == -1)
+        {
+            return n;
+        }
+        bytesRecv += n;
+        if (message[n - 1] == '\n')
+        { // every request ends with \n (message[n] = '\0')
+            break;
+        }
+        if (n == 0)
+        {
+            break;
+        }
+        bytesRecv += n;
+    }
+    return bytesRecv;
 }
 
 int timerOn(int fd)

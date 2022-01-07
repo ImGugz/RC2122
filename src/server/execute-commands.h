@@ -19,30 +19,14 @@
 #define E_FULL 8
 #define NEW 9
 
-#define MAX_GROUPS 100
-#define MAX_GID_SIZE 3
-#define MAX_GNAME_SIZE 25
-
-typedef struct ginfo
-{
-    char no[MAX_GID_SIZE];
-    char name[MAX_GNAME_SIZE];
-} GROUPINFO;
-
-typedef struct glist
-{
-    GROUPINFO groupinfo[MAX_GROUPS];
-    int no_groups;
-} GROUPLIST;
-
-extern GROUPLIST dsGroups;
-
 int userRegister(char **tokenList, int numTokens);
 int userUnregister(char **tokenlist, int numTokens);
 int userLogin(char **tokenList, int numTokens);
 int userLogout(char **tokenList, int numTokens);
-int listGroups(int numTokens);
+char *createGroupListMessage(char *code, int *groups, int num);
+char *createUserGroupsMessage(char **tokenList, int numTokens);
 int userSubscribe(char **tokenList, int numTokens, char **newGID);
 int userUnsubscribe(char **tokenList, int numTokens);
+char *createUsersInGroupMessage(char **tokenList, int numTokens);
 
 #endif
