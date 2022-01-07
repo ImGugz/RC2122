@@ -444,7 +444,7 @@ void userDebug(char *command)
     char debugCmd[4096], tmp[4096];
     int numTokens = 0;
     char *tokenList[2048];
-    sscanf(command, "debug \"%254[^\"]\"", debugCmd);
+    sscanf(command, "debug \"%[^\"]\"", debugCmd);
     size_t lenDebug = strlen(debugCmd);
     debugCmd[lenDebug] = '\n';
     debugCmd[lenDebug + 1] = '\0';
