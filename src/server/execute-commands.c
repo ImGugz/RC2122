@@ -12,7 +12,7 @@ int userRegister(char **tokenList, int numTokens)
 
     if (!(validUID(tokenList[1]) && validPW(tokenList[2])))
     { // wrong protocol message received
-        fprintf(stderr, "[-] Invalid register command arguments given.");
+        fprintf(stderr, "[-] Invalid register command arguments given.\n");
         return NOK;
     }
 
@@ -60,7 +60,7 @@ int userUnregister(char **tokenList, int numTokens)
     }
     if (!(validUID(tokenList[1]) && validPW(tokenList[2])))
     { // wrong protocol message received
-        fprintf(stderr, "[-] Invalid unregister command arguments given.");
+        fprintf(stderr, "[-] Invalid unregister command arguments given.\n");
         return NOK;
     }
 
@@ -97,7 +97,7 @@ int userLogin(char **tokenList, int numTokens)
 
     if (!(validUID(tokenList[1]) && validPW(tokenList[2])))
     { // wrong protocol message received
-        fprintf(stderr, "[-] Invalid login command arguments given.");
+        fprintf(stderr, "[-] Invalid login command arguments given.\n");
         return NOK;
     }
 
@@ -144,7 +144,7 @@ int userLogout(char **tokenList, int numTokens)
 
     if (!(validUID(tokenList[1]) && validPW(tokenList[2])))
     { // wrong protocol message received
-        fprintf(stderr, "[-] Invalid login command arguments given.");
+        fprintf(stderr, "[-] Invalid login command arguments given.\n");
         return NOK;
     }
 
