@@ -1,1 +1,5 @@
+<<<<<<< HEAD
 The Concorde is a British-French turbojet-powered supersonic passenger airliner operated from 1976 until 2003. Max. speed was over twice the speed of sound, at Mach 2.04, with seating for 92 to 128 passengers. Service altitude was 18.000 m.
+=======
+The Concorde is a British-French turbojet-powered supersonic passenger airliner operated from 1976 until 2003. Max. speed was over twice the speed of sound, at Mach 2.04, with seating for 92 to 128 passengers. Service altitude was 18.000 m.
+>>>>>>> 3364039a8a2a6437719f3ad5d7a947f71dcc6fe6

@@ -2,7 +2,7 @@
  * @file execute-commands.c
  * @author Group 18
  * @brief Execute all USER-DS commands.
- * 
+ *
  */
 
 #include "execute-commands.h"
@@ -25,7 +25,7 @@ int userSession = LOGGED_OUT;          // Keeps user's account activity log (LOG
 
 /**
  * @brief User register command - creates a new account on DS.
- * 
+ *
  * @param tokenList List containing all command arguments (including the command itself)
  * @param numTokens Number of command arguments
  */
@@ -47,7 +47,7 @@ void userRegister(char **tokenList, int numTokens)
 
 /**
  * @brief User unregister command - removes an account from DS.
- * 
+ *
  * @param tokenList List containing all command arguments (including the command itself)
  * @param numTokens Number of command arguments
  */
@@ -69,7 +69,7 @@ void userUnregister(char **tokenList, int numTokens)
 
 /**
  * @brief User login command - logs a user into a DS account.
- * 
+ *
  * @param tokenList List containing all command arguments (including the command itself)
  * @param numTokens Number of command arguments
  */
@@ -101,7 +101,7 @@ void userLogin(char **tokenList, int numTokens)
 
 /**
  * @brief User logout command - forgets the credentials of the previously logged in user.
- * 
+ *
  * @param tokenList List containing all command arguments (including the command itself)
  * @param numTokens Number of command arguments
  */
@@ -128,7 +128,7 @@ void userLogout(char **tokenList, int numTokens)
 
 /**
  * @brief User showuid command - displays the UID of the user that is logged in.
- * 
+ *
  * @param numTokens Number of command arguments
  */
 void showActiveUser(int numTokens)
@@ -149,7 +149,7 @@ void showActiveUser(int numTokens)
 
 /**
  * @brief User exit command - terminates user application.
- * 
+ *
  * @param numTokens Number of command arguments
  */
 void userExit(int numTokens)
@@ -166,7 +166,7 @@ void userExit(int numTokens)
 
 /**
  * @brief User groups command - shows all available groups on DS.
- * 
+ *
  * @param numTokens Number of command arguments
  */
 void showGroups(int numTokens)
@@ -182,7 +182,7 @@ void showGroups(int numTokens)
 
 /**
  * @brief User group subscribe command - subscribes the logged in user to a specific group.
- * 
+ *
  * @param tokenList List containing all command arguments (including the command itself)
  * @param numTokens Number of command arguments
  */
@@ -221,9 +221,9 @@ void userGroupSubscribe(char **tokenList, int numTokens)
 
 /**
  * @brief User group unsubscribe command - unsubscribes the logged in user from a specific group.
- * 
+ *
  * @param tokenList List containing all command arguments (including the command itself)
- * @param numTokens Number of command arguments 
+ * @param numTokens Number of command arguments
  */
 void userGroupUnsubscribe(char **tokenList, int numTokens)
 {
@@ -248,8 +248,8 @@ void userGroupUnsubscribe(char **tokenList, int numTokens)
 
 /**
  * @brief User my_groups command - displays logged in user's subscribed groups.
- * 
- * @param numTokens Number of command arguments 
+ *
+ * @param numTokens Number of command arguments
  */
 void userGroupsList(int numTokens)
 {
@@ -269,9 +269,9 @@ void userGroupsList(int numTokens)
 
 /**
  * @brief User select command - selects a group to sg/ulist/post/retrieve commands.
- * 
+ *
  * @param tokenList List containing all command arguments (including the command itself)
- * @param numTokens Number of command arguments 
+ * @param numTokens Number of command arguments
  */
 void userSelectGroup(char **tokenList, int numTokens)
 {
@@ -297,8 +297,8 @@ void userSelectGroup(char **tokenList, int numTokens)
 
 /**
  * @brief User showgid command - displays the GID of the group that is selected.
- * 
- * @param numTokens Number of command arguments 
+ *
+ * @param numTokens Number of command arguments
  */
 void showSelectedGroup(int numTokens)
 {
@@ -319,8 +319,8 @@ void showSelectedGroup(int numTokens)
 
 /**
  * @brief User ulist command - displays all the users that are subscribed to the selected group.
- * 
- * @param numTokens Number of command arguments 
+ *
+ * @param numTokens Number of command arguments
  */
 void showUsersGroup(int numTokens)
 {
@@ -346,7 +346,7 @@ void showUsersGroup(int numTokens)
 
 /**
  * @brief User group post command - Sends a message containing text and possibly a file to the selected group.
- * 
+ *
  * @param command Entire command given by the user (not separated by tokens like before)
  */
 void userPostGroup(char *command)
@@ -409,9 +409,9 @@ void userPostGroup(char *command)
 
 /**
  * @brief User group retrieve command - retrieves at most 20 messages from the starting given message.
- * 
+ *
  * @param tokenList List containing all command arguments (including the command itself)
- * @param numTokens Number of command arguments 
+ * @param numTokens Number of command arguments
  */
 void userRetrieveMsgs(char **tokenList, int numTokens)
 {
