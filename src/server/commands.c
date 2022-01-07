@@ -1,6 +1,6 @@
 #include "commands.h"
 
-#define CMDBUF_SIZE 256
+#define CMDBUF_SIZE 512
 #define MAX_NUM_TOKENS 4
 
 char *processClientUDP(char *buf)
@@ -9,7 +9,11 @@ char *processClientUDP(char *buf)
     char tmp[CMDBUF_SIZE];
     int numTokens = 0;
     int op, status;
-    char *response, *newGID;
+    char *response, *newGID = NULL;
+    if (buf[strlen(buf) - 1] != '\n')
+    { // all protocol messages exchanged must end with a \n
+        return "ERR\n";
+    }
     strtok(buf, "\n");
     strcpy(tmp, buf);
     token = strtok(tmp, " \n");
@@ -20,7 +24,9 @@ char *processClientUDP(char *buf)
     }
     op = parseUserCommandUDP(tokenList[0]);
     if (op == INVALID_COMMAND)
-        return NULL;
+    { // invalid protocol message received
+        return "ERR\n";
+    }
     switch (op)
     {
     case REGISTER:
@@ -40,19 +46,11 @@ char *processClientUDP(char *buf)
         response = createStatusMessage("ROU", status);
         break;
     case GROUPS_LIST:
-        status = listGroups(numTokens);
-        response = createGroupListMessage(status);
+        response = createGroupListMessage();
         break;
     case SUBSCRIBE:
-        newGID = calloc(sizeof(char), 3);
-        status = userSubscribe(tokenList, numTokens, newGID);
-        if (status == NEW)
-        {
-            response = createNewGroupStatusMessage(newGID);
-            free(newGID);
-        }
-        else
-            response = createStatusMessage("RGS", status);
+        status = userSubscribe(tokenList, numTokens, &newGID);
+        response = createSubscribeMessage(status, newGID);
         break;
     case UNSUBSCRIBE:
         status = userUnsubscribe(tokenList, numTokens);
@@ -72,7 +70,7 @@ char *processClientTCP(char *buf)
 
 void handleUDP(int clientSocket)
 {
-    char clientBuf[MAX_RECVUDP_SIZE] = "";
+    char clientBuf[MAX_RECVUDP_SIZE];
     struct sockaddr_in cliaddr;
     socklen_t addrlen;
     ssize_t n;
@@ -87,8 +85,7 @@ void handleUDP(int clientSocket)
             closeUDPSocket();
             exit(EXIT_FAILURE);
         }
-        write(1, "Client: ", 8);
-        write(1, clientBuf, n);
+        clientBuf[n] = '\0';
         serverBuf = processClientUDP(clientBuf);
         n = sendto(clientSocket, serverBuf, strlen(serverBuf) + 1, 0, (struct sockaddr *)&cliaddr, addrlen);
         if (n == -1)

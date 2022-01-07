@@ -42,7 +42,7 @@ int userUnregister(char **tokenlist, int numTokens);
 int userLogin(char **tokenList, int numTokens);
 int userLogout(char **tokenList, int numTokens);
 int listGroups(int numTokens);
-int userSubscribe(char **tokenList, int numTokens, char *newGID);
-int userUnsubscribe(char **, int);
+int userSubscribe(char **tokenList, int numTokens, char **newGID);
+int userUnsubscribe(char **tokenList, int numTokens);
 
 #endif

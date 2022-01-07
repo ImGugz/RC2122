@@ -1,5 +1,7 @@
 #include "udpandtcp.h"
 
+#define HOSTNAME_SIZE 1023
+
 int verbose = 0;
 int fdDSUDP, fdListenTCP;
 struct addrinfo hintsUDP, hintsTCP, *resUDP, *resTCP;
@@ -9,7 +11,7 @@ char portDS[PORT_SIZE] = DEFAULT_DSPORT;
 
 void setupDSSockets()
 {
-    char hostname[1024];
+    char hostname[HOSTNAME_SIZE + 1];
     // UDP
     fdDSUDP = socket(AF_INET, SOCK_DGRAM, 0);
     if (fdDSUDP == -1)
@@ -72,10 +74,9 @@ void setupDSSockets()
         exit(EXIT_FAILURE);
     }
 
-    gethostname(hostname, 1023);
-    hostname[strlen(hostname) - 1] = '\0';
-    printf("[+] DS server started at %s.\nCurrently listening in port %s for UDP and TCP connections...\n\n", hostname, portDS);
-
+    gethostname(hostname, HOSTNAME_SIZE);
+    printf("[+] DS server started at %s.\n[!] Currently listening in port %s for UDP and TCP connections...\n\n", hostname, portDS);
+    fillGroupsInfo(); // fill global struct with already existing groups
     pid_t pid = fork();
     if (pid == 0)
     { // Child process will handle everything related to UDP

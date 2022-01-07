@@ -1,6 +1,44 @@
 #include "auxfunctions.h"
 
-#define USERPW_SIZE 8
+#define DIRNAME_SIZE 530
+
+/**
+ * @brief Checks if a given user ID is valid according to the statement's rules.
+ *
+ * @param UID user ID to check if it's valid
+ * @return 1 if UID is valid, 0 otherwise
+ */
+int validUID(char *UID)
+{
+    return validRegex(UID, "^[0-9]{5}$");
+}
+
+/**
+ * @brief Checks if a given user password is valid according to the statement's rules.
+ *
+ * @param PW user password to check if it's valid
+ * @return 1 if PW is valid, 0 otherwise
+ */
+int validPW(char *PW)
+{
+    return validRegex(PW, "^[a-zA-Z0-9]{8}$");
+}
+
+int isGID(char *GID)
+{
+    return validRegex(GID, "^[0-9]{2}");
+}
+
+/**
+ * @brief Checks if a given group ID is valid according to the statement's rules.
+ *
+ * @param GID group ID to check if it's valid
+ * @return 1 if GID is valid, 0 otherwise
+ */
+int validGID(char *GID)
+{
+    return validRegex(GID, "^([0][1-9]|[1-9][0-9])$");
+}
 
 int validPort(char *portStr)
 {
@@ -59,7 +97,6 @@ void parseArgs(int argc, char *argv[])
             exit(EXIT_FAILURE);
         }
     }
-    setupDSSockets();
 }
 
 /**
@@ -115,10 +152,13 @@ int parseUserCommandUDP(char *command)
 
 char *createStatusMessage(char *command, int statusCode)
 {
-    char status[MAX_RECVUDP_SIZE];
+    char status[MAX_SENDUDP_SIZE];
     // sprintf terminates with null terminator
     switch (statusCode)
     {
+    case ERR:
+        sprintf(status, "ERR\n");
+        break;
     case OK:
         sprintf(status, "%s %s", command, "OK\n");
         break;
@@ -146,44 +186,54 @@ char *createStatusMessage(char *command, int statusCode)
     return strdup(status);
 }
 
-char *createNewGroupStatusMessage(char *GID)
+char *createSubscribeMessage(int statusCode, char *GID)
 {
-    char status[MAX_RECVUDP_SIZE];
-
-    sprintf(status, "RGS NEW %s", GID);
-
-    return strdup(status);
+    if (GID == NULL)
+    {
+        return createStatusMessage("RGS", statusCode);
+    }
+    else
+    {
+        char status[MAX_SENDUDP_SIZE];
+        sprintf(status, "RGS NEW %s\n", GID);
+        free(GID);
+        return strdup(status);
+    }
 }
 
 int removeDirectory(const char *path)
 {
     DIR *d = opendir(path);
-    size_t path_len = strlen(path);
+    size_t pathLen = strlen(path);
     int r = -1;
     if (d)
     {
-        struct dirent *p;
+        struct dirent *dir;
         r = 0;
-        while (!r && (p = readdir(d)))
+        while (!r && (dir = readdir(d)))
         {
             int r2 = -1;
             char *buf;
             size_t len;
-            /* Skip the names "." and ".." as we don't want to recurse on them. */
-            if (!strcmp(p->d_name, ".") || !strcmp(p->d_name, ".."))
+            // Skip the names "." and ".." as we don't want to recurse on them
+            if (!strcmp(dir->d_name, ".") || !strcmp(dir->d_name, ".."))
                 continue;
-            len = path_len + strlen(p->d_name) + 2;
+            len = pathLen + strlen(dir->d_name) + 2;
             buf = malloc(len);
             if (buf)
             {
                 struct stat statbuf;
-                snprintf(buf, len, "%s/%s", path, p->d_name);
+                snprintf(buf, len, "%s/%s", path, dir->d_name);
                 if (!stat(buf, &statbuf))
                 {
                     if (S_ISDIR(statbuf.st_mode))
+                    {
                         r2 = removeDirectory(buf);
+                    }
                     else
+                    {
                         r2 = unlink(buf);
+                    }
                 }
                 free(buf);
             }
@@ -192,11 +242,13 @@ int removeDirectory(const char *path)
         closedir(d);
     }
     if (!r)
+    {
         r = rmdir(path);
+    }
     return r;
 }
 
-int isDirectoryExists(const char *path)
+int directoryExists(const char *path)
 {
     struct stat stats;
     if (stat(path, &stats))
@@ -204,14 +256,14 @@ int isDirectoryExists(const char *path)
     return S_ISDIR(stats.st_mode);
 }
 
-int isCorrectPassword(const char *userDir, const char *userID, const char *pass)
+int passwordsMatch(const char *userID, const char *userPW)
 {
     FILE *fPtr;
-    char passFileName[28];
+    char passFileName[PATHPWLOGIN_SIZE];
     char *password;
     size_t n;
 
-    sprintf(passFileName, "%s/%s_pass.txt", userDir, userID);
+    sprintf(passFileName, "USERS/%s/%s_pass.txt", userID, userID);
 
     fPtr = fopen(passFileName, "r");
     if (fPtr == NULL)
@@ -226,16 +278,24 @@ int isCorrectPassword(const char *userDir, const char *userID, const char *pass)
     {
         n = fread(password, 1, USERPW_SIZE, fPtr);
         if (n == -1)
+        {
+            fprintf(stderr, "[-] Failed to read from password file.\n");
             return 0;
+        }
     }
     else
+    {
+        fprintf(stderr, "[-] Failed to allocate memory for password.\n");
         return 0;
-
+    }
     password[n] = '\0';
-    fclose(fPtr);
+    if (fclose(fPtr) == -1)
+    {
+        fprintf(stderr, "[-] Failed to close password file.\n");
+        return 0;
+    }
 
-    // Ha um invalid read of size 1 neste strcmp. Nao consigo resolver
-    if (strcmp(password, pass) != 0)
+    if (strcmp(password, userPW))
     {
         free(password);
         return 0;
@@ -245,47 +305,46 @@ int isCorrectPassword(const char *userDir, const char *userID, const char *pass)
     return 1;
 }
 
-int isCorrectGroupName(const char *groupDir, const char *GID, const char *groupName)
+int groupNamesMatch(const char *GID, const char *groupName)
 {
     FILE *fPtr;
-    char groupNameFile[42];
-    char *realGroupName;
-    int length;
+    char groupNameFile[GROUPNAMEFILE_SIZE];
     size_t n;
 
-    sprintf(groupNameFile, "%s/%s_name.txt", groupDir, GID);
-
+    sprintf(groupNameFile, "GROUPS/%s/%s_name.txt", GID, GID);
     fPtr = fopen(groupNameFile, "r");
     if (fPtr == NULL)
     {
         fprintf(stderr, "[-] Unable to open group name file.\n");
         return 0;
     }
-
+    size_t lenGivenGroup = strlen(groupName);
     fseek(fPtr, 0, SEEK_END);
-    length = ftell(fPtr);
+    int length = ftell(fPtr) - 1; // -1 to avoid \n
     fseek(fPtr, 0, SEEK_SET);
-
-    realGroupName = calloc(sizeof(char), length + 1);
-
+    char *realGroupName = calloc(sizeof(char), length + 1);
     if (realGroupName)
     {
         n = fread(realGroupName, 1, length, fPtr);
         if (n == -1)
+        {
+            fprintf(stderr, "[-] Unable to read from group name file.\n");
             return 0;
+        }
     }
     else
+    {
+        fprintf(stderr, "[-] Unable to allocate memory.\n");
         return 0;
-
+    }
     fclose(fPtr);
     realGroupName[n] = '\0';
-
     if (strcmp(realGroupName, groupName) != 0)
-    {
+    { // group names don't match
         free(realGroupName);
         return 0;
     }
-
+    // group names match
     free(realGroupName);
     return 1;
 }
@@ -299,20 +358,16 @@ int compare(const void *a, const void *b)
 
 void sortGList(GROUPLIST *list)
 {
-    printf("I'll now qsort with:\n");
-    printf("B: list->groupinfo[0].no = %s and list->groupinfo[0].name = %s\n", list->groupinfo[0].no, list->groupinfo[0].name);
-    printf("I have %d groups\n", list->no_groups);
     qsort(list->groupinfo, list->no_groups, sizeof(GROUPINFO), compare);
-    printf("A: list->groupinfo[0].no = %s and list->groupinfo[0].name = %s\n", list->groupinfo[0].no, list->groupinfo[0].name);
 }
 
-int listGroupsDir()
+void fillGroupsInfo()
 {
     DIR *d;
     struct dirent *dir;
     int i = 0;
     FILE *fp;
-    char GIDname[530]; // compiler was complaining about this size
+    char GIDname[DIRNAME_SIZE]; // compiler was complaining about this size
     (&dsGroups)->no_groups = 0;
     d = opendir("GROUPS");
     if (d)
@@ -333,24 +388,21 @@ int listGroupsDir()
             }
             ++i;
             if (i == 99)
+            {
                 break;
+            }
         }
         (&dsGroups)->no_groups = i;
         closedir(d);
     }
-    else
-        return 0;
-    if ((&dsGroups)->no_groups > 1)
-    {
-        sortGList((&dsGroups));
-    }
-    return ((&dsGroups)->no_groups);
 }
 
-char *createGroupListMessage(int numGroups)
+char *createGroupListMessage()
 {
-    char listGroups[MAX_RECVUDP_SIZE] = "";
+    char listGroups[MAX_SENDUDP_SIZE] = "";
     char *ptr = listGroups;
+    int numGroups = dsGroups.no_groups;
+    sortGList((&dsGroups));
     ptr += sprintf(ptr, "RGL %d", numGroups);
     if (numGroups > 0)
     {

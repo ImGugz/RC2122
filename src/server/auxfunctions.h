@@ -21,18 +21,30 @@
 #define UNSUBSCRIBE 7
 #define USER_GROUPS 8
 
+#define USERDIR_SIZE 12
+#define GROUPDIR_SIZE 10
+#define GROUPMSGDIR_SIZE 14
+#define GROUPNAMEFILE_SIZE 22
+#define GROUPUSERSUBFILE_SIZE 20
+#define PATHPWLOGIN_SIZE 32
+#define USERPW_SIZE 8
+
+int validUID(char *UID);
+int validPW(char *PW);
+int isGID(char *GID);
+int validGID(char *GID);
 int validMID(char *MID);
 int validRegex(char *buf, char *reg);
 void parseArgs(int argc, char *argv[]);
 int parseUserCommandUDP(char *command);
 char *createStatusMessage(char *command, int status);
-char *createNewGroupStatusMessage(char *GID);
+char *createSubscribeMessage(int statusCode, char *GID);
 int removeDirectory(const char *path);
-int isDirectoryExists(const char *path);
-int isCorrectPassword(const char *userDir, const char *userID, const char *pass);
-int isCorrectGroupName(const char *groupDir, const char *GID, const char *groupName);
-int listGroupsDir();
-char *createGroupListMessage(int numGroups);
+int directoryExists(const char *path);
+int passwordsMatch(const char *userID, const char *userPW);
+int groupNamesMatch(const char *GID, const char *groupName);
+void fillGroupsInfo();
+char *createGroupListMessage();
 int validGName(char *gName);
 int timerOn(int fd);
 int timerOff(int fd);
