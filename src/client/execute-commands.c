@@ -467,6 +467,7 @@ void userDebug(char *command)
     }
     else
     {
-        printf("[-] Mete uma mensagem de protocolo a sério caralho.\n");
+        exchangeUDPMsg(debugCmd);
+        exchangeTCPMsg(debugCmd);
     }
 }
