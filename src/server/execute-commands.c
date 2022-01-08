@@ -255,7 +255,7 @@ int userSubscribe(char **tokenList, int numTokens, char **newGID)
         return E_USR;
     }
 
-    int numGroup = atoi(tokenList[3]);
+    int numGroup = atoi(tokenList[2]);
     if (numGroup > dsGroups.no_groups)
     { // given GID doesn't exist
         fprintf(stderr, "[-] Invalid group ID given.\n");
