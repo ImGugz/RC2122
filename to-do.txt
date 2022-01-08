@@ -1,7 +1,6 @@
 - Testar server response com merdas erradas vindas do cliente (I'm on it)
 - Implementar timeout nos sockets
-- Verificar se já existe um grupo com o mesmo nome quando se cria um grupo
-- ERR é mesmo só com um comando de protocolo errado, por exemplo "RU ... ..."
 - post()
 - retrieve()
+- Usar script dos professores para saber se mensagens deles terminam mesmo com \n ou \0 e em que índices
 - Verificar tamanhos das macros se funcionam no Linux do pc do lab

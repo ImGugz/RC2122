@@ -438,15 +438,14 @@ int readTCP(int fd, char *message, int maxSize, int flag)
     while (bytesRecv < maxSize)
     {
         n = recv(fd, message + bytesRecv, maxSize - bytesRecv, 0);
-        int d = (message[n] == '\0') ? 1 : 0;
-        int e = (message[n - 1] == '\n') ? 1 : 0;
         if (n == -1)
         {
             return n;
         }
         bytesRecv += n;
-        if (message[n - 1] == '\n')
+        if (message[n - 1] == '\n' || message[n] == '\n')
         { // every request ends with \n (message[n] = '\0')
+            // TODO: CHECK THIS CONDITION WITH USER SCRIPT GIVEN BY TEACHERS AND PRINT OUT HOW IT ENDS
             break;
         }
         if (n == 0)
