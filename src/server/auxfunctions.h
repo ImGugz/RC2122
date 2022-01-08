@@ -25,6 +25,7 @@
 #define GROUP_POST 10
 #define GROUP_RETRIEVE 11
 
+#define MAX_STATUS_SIZE 14
 #define MAX_GROUPS 100
 #define MAX_GID_SIZE 3
 #define MAX_UID_SIZE 6

@@ -289,6 +289,8 @@ int userSubscribe(char **tokenList, int numTokens, char **newGID)
         { // check if there's already a group with this name
             if (!strcmp(tokenList[3], dsGroups.groupinfo[i].name))
             {
+                free(*newGID);
+                *newGID = NULL;
                 return E_GNAME;
             }
         }

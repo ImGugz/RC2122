@@ -55,6 +55,7 @@ char *processClient(char *buf)
     case UNSUBSCRIBE:
         status = userUnsubscribe(tokenList, numTokens);
         response = createStatusMessage("RGU", status);
+        printf("Aqi wih %s\n", response);
         break;
     case USER_GROUPS:
         response = createUserGroupsMessage(tokenList, numTokens);

@@ -159,7 +159,7 @@ int parseUserCommand(char *command)
 
 char *createStatusMessage(char *command, int statusCode)
 {
-    char status[10];
+    char status[MAX_STATUS_SIZE];
     // sprintf terminates with null terminator
     switch (statusCode)
     {
