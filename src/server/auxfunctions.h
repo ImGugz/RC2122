@@ -76,6 +76,7 @@ int isGID(char *GID);
 int validGID(char *GID);
 int validMID(char *MID);
 int validGName(char *gName);
+int validFilename(char *fName);
 int validRegex(char *buf, char *reg);
 
 void parseArgs(int argc, char *argv[]);

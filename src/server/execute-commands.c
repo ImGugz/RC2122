@@ -621,6 +621,11 @@ char *userPost(int acceptfd, char *peekedMsg, int recvBytes)
         }
         fileInfo[MAX_FILEINFO_SIZE - 1] = '\0';
         sscanf(fileInfo, "%s %s ", fileName, fileSize);
+        if (!(validFilename(fileName) && strlen(fileSize) <= 10))
+        {
+            fprintf(stderr, "[-] Incorrect filename or file size format.\n");
+            exit(EXIT_FAILURE);
+        }
         size_t offset = strlen(fileName) + 1 + strlen(fileSize) + 1;
         char *tmp = (char *)calloc(sizeof(char), offset + 1);
         if (tmp == NULL)

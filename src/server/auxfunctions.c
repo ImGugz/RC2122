@@ -50,6 +50,11 @@ int validMID(char *MID)
     return validRegex(MID, "^[0-9]{0,4}$");
 }
 
+int validFilename(char *fName)
+{
+    return validRegex(fName, "^[a-zA-Z0-9_-]{1,20}[.]{1}[a-z]{3}$");
+}
+
 /**
  * @brief Reads user executable arguments and parses them.
  *
@@ -435,11 +440,11 @@ char *createMessageInGroup(char *GID, char *UID, char *msgText, int msgTextSize)
     {
         sprintf(newMID, "000%d", max + 1);
     }
-    else if (10 <= max && max <= 98)
+    else if (9 <= max && max <= 98)
     {
         sprintf(newMID, "00%d", max + 1);
     }
-    else if (100 <= max && max <= 998)
+    else if (99 <= max && max <= 998)
     {
         sprintf(newMID, "0%d", max + 1);
     }
