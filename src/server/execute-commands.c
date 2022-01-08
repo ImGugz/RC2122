@@ -243,7 +243,7 @@ int userSubscribe(char **tokenList, int numTokens, char **newGID)
     sprintf(userDirname, "USERS/%s", tokenList[1]);
     if (!directoryExists(userDirname))
     { // check if user is registered
-        fprintf(stderr, "[-] User %s is not previously registered.\n", tokenList[1]);
+        fprintf(stderr, "[-] User %s isn't registered.\n", tokenList[1]);
         return E_USR;
     }
 
@@ -253,6 +253,13 @@ int userSubscribe(char **tokenList, int numTokens, char **newGID)
     { // check if user is logged in
         fprintf(stderr, "[-] User %s isn't currently logged in.\n", tokenList[1]);
         return E_USR;
+    }
+
+    int numGroup = atoi(tokenList[3]);
+    if (numGroup > dsGroups.no_groups)
+    { // given GID doesn't exist
+        fprintf(stderr, "[-] Invalid group ID given.\n");
+        return E_GRP;
     }
 
     if (!strcmp(tokenList[2], "00"))
@@ -282,7 +289,7 @@ int userSubscribe(char **tokenList, int numTokens, char **newGID)
         { // check if there's already a group with this name
             if (!strcmp(tokenList[3], dsGroups.groupinfo[i].name))
             {
-                return E_GRP;
+                return E_GNAME;
             }
         }
 
@@ -372,14 +379,6 @@ int userSubscribe(char **tokenList, int numTokens, char **newGID)
     // This else is safe to assume because isGID has already made sure that the given GID is valid (00 - 99)
     else
     { // Subscribe to existing group
-        char groupDirName[GROUPDIR_SIZE];
-        sprintf(groupDirName, "GROUPS/%s", tokenList[2]);
-
-        if (!directoryExists(groupDirName))
-        { // check if given group exists
-            fprintf(stderr, "[-] Invalid group number given.\n");
-            return E_GRP;
-        }
 
         if (!groupNamesMatch(tokenList[2], tokenList[3]))
         { // check if given group name matches the stored one
@@ -389,7 +388,7 @@ int userSubscribe(char **tokenList, int numTokens, char **newGID)
 
         // Create subscribed user file
         char userSubscribedFile[GROUPUSERSUBFILE_SIZE];
-        sprintf(userSubscribedFile, "%s/%s.txt", groupDirName, tokenList[1]);
+        sprintf(userSubscribedFile, "GROUPS/%s/%s.txt", tokenList[2], tokenList[1]);
         FILE *fPtr = fopen(userSubscribedFile, "a");
         if (fPtr == NULL)
         {
