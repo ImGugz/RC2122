@@ -28,17 +28,30 @@
 #define MAX_GROUPS 100
 #define MAX_GID_SIZE 3
 #define MAX_UID_SIZE 6
+#define MAX_MID_SIZE 5
 #define MAX_GNAME_SIZE 25
 #define DIRNAME_SIZE 530
 #define USERDIR_SIZE 12
 #define GROUPDIR_SIZE 10
 #define GROUPMSGDIR_SIZE 14
+#define GROUPNEWMSGDIR_SIZE 19
+#define GROUPNEWMSGAUT_SIZE 35
+#define GROUPNEWMSGTXT_SIZE 31
+#define GROUPNEWMSGFILE_SIZE 43
 #define GROUPNAMEFILE_SIZE 22
 #define GROUPUSERSUBFILE_SIZE 20
 #define PATHPWLOGIN_SIZE 32
 #define USERPW_SIZE 8
 #define GROUPNAME_SIZE 26
 #define INITIAL_ULBUF_SIZE 92 // 32 + 6*10
+#define ULCLIENT_BUF_SIZE 7
+#define MAX_TEXTSZ_SIZE 4
+#define MAX_PSTTEXT_SIZE 242
+#define MAX_FILEINFO_SIZE 37
+#define MAX_FILENAME_SIZE 25
+#define MAX_FILESZ_SIZE 11
+
+#define MIN(x, y) (((x) < (y)) ? (x) : (y)) // Macro to determine min(x, y)
 
 #define ERR_MSG "ERR\n"
 
@@ -68,6 +81,10 @@ void parseArgs(int argc, char *argv[]);
 void logVerbose(char *buf, struct sockaddr_in s);
 int parseUserCommand(char *command);
 void fillGroupsInfo();
+
+char *createMessageInGroup(char *GID, char *UID, char *msgText, int msgTextSize);
+int readFile(int fd, char *GID, char *MID, char *fileName, long int fileSize);
+
 int compareIDs(const void *a, const void *b);
 
 char *createStatusMessage(char *command, int status);

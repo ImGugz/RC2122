@@ -362,7 +362,7 @@ int sendFile(FILE *post, long lenFile)
         }
         if (lenFile - num == 0)
         { // Each request/reply ends with a \n
-            buffer[num] = '\n';
+            buffer[num++] = '\n';
         }
         if (!sendData(buffer, num))
         {

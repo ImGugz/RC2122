@@ -148,6 +148,8 @@ int parseUserCommand(char *command)
         return USER_GROUPS;
     else if (strcmp(command, "ULS") == 0)
         return USERS_LIST;
+    else if (strcmp(command, "PST") == 0)
+        return GROUP_POST;
     else
     {
         fprintf(stderr, "[-] Invalid protocol command code received. Please try again.\n");
@@ -157,7 +159,7 @@ int parseUserCommand(char *command)
 
 char *createStatusMessage(char *command, int statusCode)
 {
-    char status[MAX_SENDUDP_SIZE];
+    char status[10];
     // sprintf terminates with null terminator
     switch (statusCode)
     {
@@ -188,6 +190,7 @@ char *createStatusMessage(char *command, int statusCode)
     default:
         break;
     }
+
     return strdup(status);
 }
 
@@ -402,6 +405,152 @@ void fillGroupsInfo()
     }
 }
 
+char *createMessageInGroup(char *GID, char *UID, char *msgText, int msgTextSize)
+{
+    char groupMsgPath[GROUPMSGDIR_SIZE];
+    sprintf(groupMsgPath, "GROUPS/%s/MSG", GID);
+    struct dirent **d;
+    int n = scandir(groupMsgPath, &d, 0, alphasort);
+    int max = 0, flag = 0;
+    if (n < 0)
+    {
+        perror("[-] scandir on post");
+        return NULL;
+    }
+    while (n--)
+    {
+        if (!flag)
+        {
+            if (validMID(d[n]->d_name))
+            {
+                max = atoi(d[n]->d_name);
+                flag = 1;
+            }
+        }
+        free(d[n]);
+    }
+    free(d);
+    char newMID[MAX_MID_SIZE];
+    if (0 <= max && max <= 8)
+    {
+        sprintf(newMID, "000%d", max + 1);
+    }
+    else if (10 <= max && max <= 98)
+    {
+        sprintf(newMID, "00%d", max + 1);
+    }
+    else if (100 <= max && max <= 998)
+    {
+        sprintf(newMID, "0%d", max + 1);
+    }
+    else
+    { // safe to assume because of validMID
+        sprintf(newMID, "%d", max + 1);
+    }
+    char newMIDPath[GROUPNEWMSGDIR_SIZE];
+    sprintf(newMIDPath, "GROUPS/%s/MSG/%s", GID, newMID);
+    int ret = mkdir(newMIDPath, 0700);
+    if (ret == -1)
+    {
+        perror("[-] Post failed to create new MSG directory");
+        return NULL;
+    }
+    FILE *author, *text;
+
+    // New message's author file
+    char newMIDAuthorPath[GROUPNEWMSGAUT_SIZE];
+    sprintf(newMIDAuthorPath, "%s/A U T H O R.txt", newMIDPath);
+    author = fopen(newMIDAuthorPath, "w");
+    if (author == NULL)
+    {
+        perror("[-] Post failed to create new msg author file");
+        return NULL;
+    }
+    if (fwrite(UID, sizeof(char), MAX_UID_SIZE - 1, author) != MAX_UID_SIZE - 1)
+    {
+        perror("[-] Post failed to write on new message author file");
+        return NULL;
+    }
+    if (fwrite("\n", sizeof(char), 1, author) != 1)
+    { // end author file with \n (same as tejo)
+        perror("[-] Post failed to write on new message author file (nl)");
+        return NULL;
+    }
+    if (fclose(author) == -1)
+    {
+        perror("[-] Post failed to close new msg author file");
+        return NULL;
+    }
+
+    // New message's text file
+    char newMIDTextPath[GROUPNEWMSGTXT_SIZE];
+    sprintf(newMIDTextPath, "%s/T E X T.txt", newMIDPath);
+    text = fopen(newMIDTextPath, "w");
+    if (text == NULL)
+    {
+        perror("[-] Post failed to create new msg text file");
+        return NULL;
+    }
+    if (fwrite(msgText, sizeof(char), msgTextSize, text) != msgTextSize)
+    {
+        perror("[-] Post failed to write on new message text file");
+        return NULL;
+    }
+    if (fclose(text) == -1)
+    {
+        perror("[-] Post failed to close new msg text file");
+        return NULL;
+    }
+    return strdup(newMID);
+}
+
+int readFile(int fd, char *GID, char *MID, char *fileName, long int fileSize)
+{
+    char newMIDFilePath[GROUPNEWMSGFILE_SIZE];
+    sprintf(newMIDFilePath, "GROUPS/%s/MSG/%s/%s", GID, MID, fileName);
+    FILE *newFile = fopen(newMIDFilePath, "wb");
+    if (newFile == NULL)
+    {
+        perror("[-] Failed to create post file");
+        return 0;
+    }
+    unsigned char fileBuffer[2048] = "";
+    long bytesRecv = 0;
+    int toRead;
+    ssize_t n;
+    do
+    {
+        toRead = MIN(sizeof(fileBuffer), fileSize - bytesRecv);
+        n = recv(fd, fileBuffer, toRead, 0);
+        if (n == -1)
+        {
+            if (!(errno == EAGAIN || errno == EWOULDBLOCK))
+            {
+                perror("[-] Failed to read file on post");
+                close(fd);
+                exit(EXIT_FAILURE);
+            }
+            else
+            {
+                perror("[-] Timeout reading file on post");
+                close(fd);
+                exit(EXIT_FAILURE);
+            }
+        }
+        if (n > 0)
+        {
+            bytesRecv += n;
+            fwrite(fileBuffer, sizeof(unsigned char), n, newFile);
+        }
+    } while (bytesRecv < fileSize);
+    if (fclose(newFile) == -1)
+    {
+        perror("[-] Failed to close new file");
+        return 0;
+    }
+    return 1;
+}
+
 int compareIDs(const void *a, const void *b)
 {
     return *(int *)a - *(int *)b;
@@ -430,8 +579,6 @@ int readTCP(int fd, char *message, int maxSize, int flag)
         if (n == -1)
         {
             perror("[-] Failed to receive from server on TCP");
-            closeUDPSocket();
-            closeTCPSocket();
         }
         return n;
     }
@@ -443,7 +590,7 @@ int readTCP(int fd, char *message, int maxSize, int flag)
             return n;
         }
         bytesRecv += n;
-        if (message[n - 1] == '\n' || message[n] == '\n')
+        if (message[bytesRecv - 1] == '\n')
         { // every request ends with \n (message[n] = '\0')
             // TODO: CHECK THIS CONDITION WITH USER SCRIPT GIVEN BY TEACHERS AND PRINT OUT HOW IT ENDS
             break;

@@ -189,7 +189,7 @@ char *createGroupListMessage(char *code, int *groups, int num)
         struct dirent **d;
         int n, flag;
         int j;
-        char groupPath[MAX_GNAME_SIZE];
+        char groupPath[GROUPMSGDIR_SIZE];
         for (int i = 0; i < numGroups; ++i)
         {
             j = (groups == NULL) ? i : groups[i];
@@ -497,14 +497,18 @@ char *createUserGroupsMessage(char **tokenList, int numTokens)
     return createGroupListMessage("RGM", groupsSubscribed, numGroupsSub);
 }
 
-char *createUsersInGroupMessage(char **tokenList, int numTokens)
+char *createUsersInGroupMessage(int acceptfd, char *peekedMsg)
 {
-    if (numTokens != 2)
-    { // server at tejo exits
-        fprintf(stderr, "[-] Invalid ULS message received");
-        return strdup(ERR_MSG);
+    char clientBuf[ULCLIENT_BUF_SIZE + 1] = "";
+    char givenGID[MAX_GID_SIZE];
+    readTCP(acceptfd, clientBuf, ULCLIENT_BUF_SIZE, 0); // actually read all bytes - if it gets here then timeout isn't need to check
+    sscanf(clientBuf, "ULS %2s", givenGID);
+    if (!(clientBuf[ULCLIENT_BUF_SIZE - 1] == '\n'))
+    { // every request must end with \n
+        fprintf(stderr, "[-] Wrong ulist command received according to protocol.\n");
+        exit(EXIT_FAILURE); // if not abandon new process execution
     }
-    if (!validGID(tokenList[1]))
+    if (!validGID(givenGID))
     { // server at tejo exits
         fprintf(stderr, "[-] Invalid ULS arguments receibed.\n");
         return strdup("RUL NOK\n");
@@ -512,13 +516,13 @@ char *createUsersInGroupMessage(char **tokenList, int numTokens)
     sortGList((&dsGroups));
     char *users, *tmp;
     int len = 0, curr = 0;
-    int groupNum = atoi(tokenList[1]);
+    int groupNum = atoi(givenGID);
     if (groupNum > dsGroups.no_groups)
     { // group doesn't exist - tejo returns NOK
         return strdup("RUL NOK\n");
     }
     char groupDirName[GROUPDIR_SIZE];
-    sprintf(groupDirName, "GROUPS/%s", tokenList[1]);
+    sprintf(groupDirName, "GROUPS/%s", givenGID);
     DIR *d;
     d = opendir(groupDirName);
     if (d)
@@ -533,14 +537,14 @@ char *createUsersInGroupMessage(char **tokenList, int numTokens)
         }
         users = tmp;
         len = INITIAL_ULBUF_SIZE;
-        curr += sprintf(users + curr, "RUL OK %s ", tokenList[1]);
+        curr += sprintf(users + curr, "RUL OK %s ", givenGID);
         while ((dir = readdir(d)) != NULL)
         {
             if (!strcmp(dir->d_name, ".") || !strcmp(dir->d_name, ".."))
             {
                 continue;
             }
-            if (strlen(dir->d_name) < 9) // UID + 1 + 3
+            if (strlen(dir->d_name) != 9) // UID + 1 + 3
             {
                 continue;
             }
@@ -566,4 +570,73 @@ char *createUsersInGroupMessage(char **tokenList, int numTokens)
     }
     curr += sprintf(users + curr, "\n");
     return users;
+}
+
+char *userPost(int acceptfd, char *peekedMsg, int recvBytes)
+{
+    char clientBuf[MAX_RECVTCP_SIZE];
+    char givenUID[MAX_UID_SIZE], givenGID[MAX_GID_SIZE], givenTextSize[MAX_TEXTSZ_SIZE], givenText[MAX_PSTTEXT_SIZE];
+    int textSize;
+    sscanf(peekedMsg, "PST %s %s %s ", givenUID, givenGID, givenTextSize); // assumes at least offset bytes will come
+    textSize = atoi(givenTextSize);
+    if (!(validUID(givenUID) && validGID(givenGID) && textSize <= 240))
+    { // abort new process execution
+        fprintf(stderr, "[-] Wrong post command received according to protocol.\n");
+        close(acceptfd);
+        exit(EXIT_FAILURE);
+    }
+    char *tmpPtr = clientBuf;
+    size_t initialPostOffset = 3 + 1 + strlen(givenUID) + 1 + strlen(givenGID) + 1 + strlen(givenTextSize) + 1; // << 259
+    readTCP(acceptfd, clientBuf, initialPostOffset, 0);
+    clientBuf[recvBytes] = '\0';
+    tmpPtr += initialPostOffset;
+    readTCP(acceptfd, givenText, textSize + 1, 0);
+    givenText[textSize + 1] = '\0';
+    char *newMID = createMessageInGroup(givenGID, givenUID, givenText, textSize);
+    if (!newMID)
+    {
+        return "NOK";
+    }
+    if (givenText[textSize] != '\n')
+    { // text + file case
+        char fileInfo[MAX_FILEINFO_SIZE];
+        char fileName[MAX_FILENAME_SIZE], fileSize[MAX_FILESZ_SIZE];
+        int n = readTCP(acceptfd, fileInfo, MAX_FILEINFO_SIZE - 1, MSG_PEEK);
+        if (n == -1)
+        {
+            if (!(errno == EAGAIN || errno == EWOULDBLOCK))
+            {
+                perror("[-] Failed to read file on post");
+                close(acceptfd);
+                exit(EXIT_FAILURE);
+            }
+            else
+            {
+                perror("[-] Timeout reading file on post");
+                close(acceptfd);
+                exit(EXIT_FAILURE);
+            }
+        }
+        fileInfo[MAX_FILEINFO_SIZE - 1] = '\0';
+        sscanf(fileInfo, "%s %s ", fileName, fileSize);
+        size_t offset = strlen(fileName) + 1 + strlen(fileSize) + 1;
+        char *tmp = (char *)calloc(sizeof(char), offset + 1);
+        if (tmp == NULL)
+        {
+            fprintf(stderr, "[-] Failed to allocate on post file");
+            return "NOK";
+        }
+        char *offsetBuf = tmp;
+        recv(acceptfd, offsetBuf, offset, 0);
+        offsetBuf[offset] = '\0';
+        free(offsetBuf);
+        offsetBuf = NULL;
+        long fileSz = atol(fileSize);
+        int post = readFile(acceptfd, givenGID, newMID, fileName, fileSz);
+        if (!post)
+        {
+            return "NOK";
+        }
+    }
+    return newMID;
 }

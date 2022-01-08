@@ -59,11 +59,46 @@ char *processClient(char *buf)
     case USER_GROUPS:
         response = createUserGroupsMessage(tokenList, numTokens);
         break;
+    }
+    return response;
+}
+
+char *createPostStatusMessage(char *status)
+{
+    if (!strcmp(status, "NOK"))
+    {
+        return strdup("RPT NOK\n");
+    }
+    else if (validMID(status))
+    {
+        char answer[10];
+        sprintf(answer, "RPT %s\n", status);
+        free(status);
+        return strdup(answer);
+    }
+}
+
+char *processClientTCP(int acceptfd, char *peekedMsg, int recvBytes)
+{
+    char opMsg[4];
+    char *response;
+    char *status;
+    sscanf(peekedMsg, "%3s", opMsg);
+    int op = parseUserCommand(opMsg);
+    if (op == INVALID_COMMAND)
+    { // invalid protocol message received
+        return strdup(ERR_MSG);
+    }
+    switch (op)
+    {
     case USERS_LIST:
-        response = createUsersInGroupMessage(tokenList, numTokens);
+        response = createUsersInGroupMessage(acceptfd, peekedMsg);
+        break;
+    case GROUP_POST:
+        status = userPost(acceptfd, peekedMsg, recvBytes);
+        response = createPostStatusMessage(status);
         break;
     }
-
     return response;
 }
 
@@ -128,7 +163,7 @@ void handleTCP(int listenSocket)
                 close(newTCPfd);
                 break;
             }
-            n = readTCP(newTCPfd, clientBuf, MAX_RECVTCP_SIZE - 1, 0);
+            n = readTCP(newTCPfd, clientBuf, MAX_RECVTCP_SIZE - 1, MSG_PEEK);
             if (n == -1)
             {
                 if (!(errno == EAGAIN || errno == EWOULDBLOCK))
@@ -152,7 +187,7 @@ void handleTCP(int listenSocket)
             {
                 logVerbose(clientBuf, cliaddr);
             }
-            serverBuf = processClient(clientBuf);
+            serverBuf = processClientTCP(newTCPfd, clientBuf, n);
             n = write(newTCPfd, serverBuf, strlen(serverBuf) + 1);
             if (n == -1)
             {

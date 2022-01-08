@@ -27,6 +27,7 @@ char *createGroupListMessage(char *code, int *groups, int num);
 char *createUserGroupsMessage(char **tokenList, int numTokens);
 int userSubscribe(char **tokenList, int numTokens, char **newGID);
 int userUnsubscribe(char **tokenList, int numTokens);
-char *createUsersInGroupMessage(char **tokenList, int numTokens);
+char *createUsersInGroupMessage(int acceptfd, char *peekedMsg);
+char *userPost(int acceptfd, char *peekedMsg, int recvBytes);
 
 #endif
