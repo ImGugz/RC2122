@@ -130,7 +130,7 @@ int validRegex(char *buf, char *reg)
 
 void logVerbose(char *clientBuf, struct sockaddr_in s)
 {
-    printf("[!] Client @ %s in port %d sent: %s", inet_ntoa(s.sin_addr), ntohs(s.sin_port), clientBuf);
+    printf("[!] Client @ %s in port %d sent: %s\n", inet_ntoa(s.sin_addr), ntohs(s.sin_port), clientBuf);
 }
 
 int parseUserCommand(char *command)

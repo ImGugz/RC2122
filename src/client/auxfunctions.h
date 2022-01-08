@@ -46,7 +46,7 @@ void parseArgs(int argc, char *argv[]);
 int isNumber(char *num);
 void printGroups(char *buffer, int numGroups);
 int parseUserCommand(char *command);
-int sendData(char *buffer, size_t num);
+int sendData(unsigned char *buffer, size_t num);
 int sendFile(FILE *post, long lenFile);
 void sendTCP(char *message);
 int readTCP(char *message, int maxSize, int flag);

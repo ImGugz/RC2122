@@ -424,7 +424,7 @@ in_port_t get_in_port(struct sockaddr *sa)
 void logTCPServer(char *message)
 { // TODO: DELETE
     struct sockaddr_in *addr = (struct sockaddr_in *)resTCP->ai_addr;
-    printf("[!] Server @ %s in port %d sent: (%s)", inet_ntoa(((struct in_addr)addr->sin_addr)), ntohs(get_in_port((struct sockaddr *)resTCP->ai_addr)), message);
+    printf("[!] Server @ %s in port %d sent: %s", inet_ntoa(((struct in_addr)addr->sin_addr)), ntohs(get_in_port((struct sockaddr *)resTCP->ai_addr)), message);
 }
 
 /**

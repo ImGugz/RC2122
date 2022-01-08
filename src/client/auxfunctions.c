@@ -223,7 +223,7 @@ int isSlash(char *slash)
  */
 int isMID(char *MID)
 {
-    return validRegex(MID, "^[0-9]{0,4}$");
+    return validRegex(MID, "^[0-9]{4}$");
 }
 
 /**
@@ -320,9 +320,9 @@ int parseUserCommand(char *command)
  * @param num number of bytes to be sent
  * @return 1 if num bytes of buffer were sent and 0 otherwise
  */
-int sendData(char *buffer, size_t num)
+int sendData(unsigned char *buffer, size_t num)
 {
-    unsigned char *tmpBuf = (unsigned char *)buffer;
+    unsigned char *tmpBuf = buffer;
     ssize_t n;
     while (num > 0)
     {
@@ -331,6 +331,10 @@ int sendData(char *buffer, size_t num)
         {
             perror("[-] Failed to send file data via TCP");
             return 0;
+        }
+        if (num - n == 0)
+        {
+            printf("Last sent was \\n: %d\n", (tmpBuf[n - 1] == '\n') ? 1 : 0);
         }
         tmpBuf += n;
         num -= n;
@@ -347,11 +351,11 @@ int sendData(char *buffer, size_t num)
  */
 int sendFile(FILE *post, long lenFile)
 {
-    char buffer[1025];
+    unsigned char buffer[1024 + 1] = "";
     do
     {
         size_t num = MIN(lenFile, sizeof(buffer) - 1); // sizeof(buffer)-1 so it only reads 1024 worst case and buffer[num] = '\n' doesn't SIGSEGV
-        num = fread(buffer, sizeof(char), num, post);
+        num = fread(buffer, sizeof(unsigned char), num, post);
         if (num < 1)
         {
             fprintf(stderr, "[-] Failed on reading the given file. Please try again.\n");
@@ -361,8 +365,10 @@ int sendFile(FILE *post, long lenFile)
             return 0;
         }
         if (lenFile - num == 0)
-        { // Each request/reply ends with a \n
+        {
+            printf("Yo: %ld\n", num);
             buffer[num++] = '\n';
+            printf("Ye: %ld and %d\n", num, (buffer[num - 1] == '\n') ? 1 : 0);
         }
         if (!sendData(buffer, num))
         {
@@ -372,6 +378,7 @@ int sendFile(FILE *post, long lenFile)
             return 0;
         }
         lenFile -= num;
+        memset(buffer, 0, sizeof(buffer));
     } while (lenFile > 0);
     return 1;
 }

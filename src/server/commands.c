@@ -55,7 +55,6 @@ char *processClient(char *buf)
     case UNSUBSCRIBE:
         status = userUnsubscribe(tokenList, numTokens);
         response = createStatusMessage("RGU", status);
-        printf("Aqi wih %s\n", response);
         break;
     case USER_GROUPS:
         response = createUserGroupsMessage(tokenList, numTokens);
@@ -185,7 +184,7 @@ void handleTCP(int listenSocket)
             }
             clientBuf[n] = '\0';
             if (verbose)
-            {
+            { // in PST command it can happen to not print newline because of filesize > MAX_RECVTCP_SIZE
                 logVerbose(clientBuf, cliaddr);
             }
             serverBuf = processClientTCP(newTCPfd, clientBuf, n);
