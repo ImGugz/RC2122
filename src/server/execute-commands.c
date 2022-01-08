@@ -179,7 +179,6 @@ int userLogout(char **tokenList, int numTokens)
 
 char *createGroupListMessage(char *code, int *groups, int num)
 {
-<<<<<<< HEAD
     char listGroups[MAX_SENDUDP_SIZE] = "";
     char *ptr = listGroups;
     int numGroups = (groups == NULL) ? dsGroups.no_groups : num;
@@ -222,12 +221,6 @@ char *createGroupListMessage(char *code, int *groups, int num)
                 }
             }
         }
-=======
-    if (numTokens != 1)
-    { // wrong protocol message received
-        fprintf(stderr, "[-] Invalid GLS protocol message received.\n");
-        return NOK;
->>>>>>> 3364039a8a2a6437719f3ad5d7a947f71dcc6fe6
     }
     ptr += sprintf(ptr, "\n");
     return strdup(listGroups);
@@ -283,6 +276,14 @@ int userSubscribe(char **tokenList, int numTokens, char **newGID)
         else
         {
             sprintf(*newGID, "%d", dsGroups.no_groups + 1);
+        }
+
+        for (int i = 0; i < dsGroups.no_groups; ++i)
+        { // check if there's already a group with this name
+            if (!strcmp(tokenList[3], dsGroups.groupinfo[i].name))
+            {
+                return E_GRP;
+            }
         }
 
         // Add group to directory
