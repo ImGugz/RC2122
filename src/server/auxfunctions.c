@@ -448,9 +448,13 @@ char *createMessageInGroup(char *GID, char *UID, char *msgText, int msgTextSize)
     {
         sprintf(newMID, "0%d", max + 1);
     }
-    else
-    { // safe to assume because of validMID
+    else if (999 <= max && max <= 9998)
+    {
         sprintf(newMID, "%d", max + 1);
+    }
+    else
+    { // message limit
+        return NULL;
     }
     char newMIDPath[GROUPNEWMSGDIR_SIZE];
     sprintf(newMIDPath, "GROUPS/%s/MSG/%s", GID, newMID);
