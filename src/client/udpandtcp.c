@@ -408,8 +408,23 @@ void exchangeTCPPost(char *message, FILE *post, long lenFile)
         exit(EXIT_FAILURE);
     }
     msgRecvBuf[nTCP] = '\0'; // will never SIGSEGV
+    logTCPServer(msgRecvBuf);
     processTCPMsg(msgRecvBuf, NULL);
     closeTCPSocket();
+}
+
+in_port_t get_in_port(struct sockaddr *sa)
+{ // TODO: DELETE
+    if (sa->sa_family == AF_INET)
+        return (((struct sockaddr_in *)sa)->sin_port);
+
+    return (((struct sockaddr_in6 *)sa)->sin6_port);
+}
+
+void logTCPServer(char *message)
+{ // TODO: DELETE
+    struct sockaddr_in *addr = (struct sockaddr_in *)resTCP->ai_addr;
+    printf("[!] Server @ %s in port %d sent: (%s)", inet_ntoa(((struct in_addr)addr->sin_addr)), ntohs(get_in_port((struct sockaddr *)resTCP->ai_addr)), message);
 }
 
 /**
@@ -452,6 +467,7 @@ void exchangeTCPMsg(char *message)
         bytesRecv += nTCP;
     }
     listRecvBuf[bytesRecv] = '\0'; // will never SIGSEGV (worst case when it gets here bytesRecv = lenBuf-1)
+    logTCPServer(listRecvBuf);
     processTCPMsg(listRecvBuf, NULL);
     free(listRecvBuf);
     closeTCPSocket();
@@ -476,6 +492,7 @@ void exchangeTCPRet(char *message)
         exit(EXIT_FAILURE);
     }
     codeStatus[nTCP] = '\0'; // \n will be ignored (irrelevant) -> will never SIGSEGV
+    logTCPServer(codeStatus);
     int flag;
     processTCPMsg(codeStatus, &flag); // flag as pointer to be set in processTCPMsg function
     if (!flag)
@@ -488,6 +505,7 @@ void exchangeTCPRet(char *message)
         exit(EXIT_FAILURE);
     }
     numRRTMsgs[nTCP] = '\0'; // will never SIGSEGV
+    logTCPServer(numRRTMsgs);
     if (atoi(numRRTMsgs) >= 10)
     { // if there are more than 10 messages we must read an extra space to match the pointer
         // in the case where there are < 10 messages
@@ -496,6 +514,7 @@ void exchangeTCPRet(char *message)
             exit(EXIT_FAILURE);
         }
         backspace[nTCP] = '\0'; // will never SIGSEGV
+        logTCPServer(backspace);
     }
     int nMsg = atoi(numRRTMsgs);
     if (nMsg == 1)
@@ -516,6 +535,7 @@ void exchangeTCPRet(char *message)
             exit(EXIT_FAILURE);
         }
         rrtBuf[nTCP] = '\0';
+        logTCPServer(rrtBuf);
         if (nTCP == 0 || (nTCP == 1 && rrtBuf[0] == '\n'))
         { // nothing else to read
             break;
@@ -536,6 +556,7 @@ void exchangeTCPRet(char *message)
             exit(EXIT_FAILURE);
         }
         rrtOffset[nTCP] = '\0';
+        logTCPServer(rrtOffset);
         free(temp);
         temp = NULL;
         long bytesToRead = atol(textOrFileSize);
@@ -553,6 +574,7 @@ void exchangeTCPRet(char *message)
                 exit(EXIT_FAILURE);
             }
             textBuf[nTCP - 1] = '\0'; // will never SIGSEGV (-1 because of extra space read)
+            logTCPServer(textBuf);
             printf("-> %s: %s\n", slashOrMID, textBuf);
         }
         else if (strlen(slashOrMID) == 1 && slashOrMID[0] == '/')
@@ -571,6 +593,7 @@ void exchangeTCPRet(char *message)
                 exit(EXIT_FAILURE);
             }
             backspace[nTCP] = '\0';
+            logTCPServer(backspace);
         }
         else
         {

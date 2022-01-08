@@ -37,6 +37,9 @@ void createUDPSocket();
 void exchangeUDPMsg(char *message);
 void closeUDPSocket();
 
+// TOOD: DELETE THIS
+void logTCPServer(char *message);
+
 // TCP related functions
 void exchangeTCPMsg(char *message);
 void exchangeTCPPost(char *message, FILE *toPost, long lenFile);
