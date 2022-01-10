@@ -79,6 +79,9 @@ int userUnregister(char **tokenList, int numTokens)
         return NOK;
     }
 
+    if (!unsubscribeUserGroups(tokenList[1]))
+        return NOK;
+
     if (removeDirectory(userDirname) == -1)
     { // user directory failed to be removed
         fprintf(stderr, "[-] Failed to remove user directory.\n");
@@ -491,7 +494,9 @@ char *createUserGroupsMessage(char **tokenList, int numTokens)
                 groupsSubscribed[numGroupsSub++] = atoi(dir->d_name) - 1;
             }
         }
+        free(d);
     }
+
     if (numGroupsSub > 0)
     { // sort group index's
         qsort(groupsSubscribed, numGroupsSub, sizeof(int), compareIDs);

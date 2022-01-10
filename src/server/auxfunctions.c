@@ -199,6 +199,29 @@ char *createStatusMessage(char *command, int statusCode)
     return strdup(status);
 }
 
+int unsubscribeUserGroups(char *UID)
+{
+    DIR *d;
+    struct dirent *group;
+    char userSubscribedFile[268];
+
+    if ((d = opendir("GROUPS")) < 0)
+        return 0;
+
+    while (group = readdir(d))
+    {
+        sprintf(userSubscribedFile, "GROUPS/%s/%s.txt", group->d_name, UID);
+        if (unlink(userSubscribedFile) != 0 && errno != ENOENT)
+        {
+            free(d);
+            return 0;
+        }
+    }
+
+    free(d);
+    return 1;
+}
+
 char *createSubscribeMessage(int statusCode, char *GID)
 {
     if (GID == NULL)
@@ -611,6 +634,89 @@ int readTCP(int fd, char *message, int maxSize, int flag)
         bytesRecv += n;
     }
     return bytesRecv;
+}
+
+int getAuthorID(char *messageDir, char *authorID)
+{
+    FILE *fPtr;
+    char authorFileName[GROUPNEWMSGAUT_SIZE];
+    size_t n;
+
+    sprintf(authorFileName, "%s/A U T H O R", messageDir);
+
+    fPtr = fopen(authorFileName, "r");
+    if (fPtr == NULL)
+    {
+        fprintf(stderr, "[-] Unable to open author file.\n");
+        return 0;
+    }
+
+    authorID = calloc(sizeof(char), MAX_UID_SIZE);
+
+    if (authorID)
+    {
+        n = fread(authorID, 1, MAX_UID_SIZE - 1, fPtr);
+        if (n == -1)
+        {
+            fprintf(stderr, "[-] Failed to read from author file.\n");
+            return 0;
+        }
+    }
+    else
+    {
+        fprintf(stderr, "[-] Failed to allocate memory for author.\n");
+        return 0;
+    }
+    authorID[n] = '\0';
+    if (fclose(fPtr) == -1)
+    {
+        fprintf(stderr, "[-] Failed to close author file.\n");
+        return 0;
+    }
+
+    return 1;
+}
+
+int getMessage(char *currMessageDir, char *message, size_t *msg_size)
+{
+    FILE *fPtr;
+    char messageFileName[GROUPNEWMSGTXT_SIZE];
+    size_t n;
+
+    sprintf(messageFileName, "%s/T E X T.txt", currMessageDir);
+    fPtr = fopen(messageFileName, "r");
+    if (fPtr == NULL)
+    {
+        fprintf(stderr, "[-] Unable to open author file.\n");
+        return 0;
+    }
+
+    fseek(fPtr, 0, SEEK_END);
+    *msg_size = ftell(fPtr);
+    fseek(fPtr, 0, SEEK_SET);
+
+    message = calloc(sizeof(char), *msg_size);
+
+    if (message)
+    {
+        n = fread(message, 1, *msg_size, fPtr);
+        if (n == -1)
+        {
+            fprintf(stderr, "[-] Failed to read from message file.\n");
+            return 0;
+        }
+    }
+    else
+    {
+        fprintf(stderr, "[-] Failed to allocate memory for message.\n");
+        return 0;
+    }
+    message[n] = '\0';
+    if (fclose(fPtr) == -1)
+    {
+        fprintf(stderr, "[-] Failed to close message file.\n");
+        return 0;
+    }
 }
 
 int timerOn(int fd)

@@ -79,6 +79,8 @@ int validGName(char *gName);
 int validFilename(char *fName);
 int validRegex(char *buf, char *reg);
 
+int unsubscribeUserGroups(char *UID);
+
 void parseArgs(int argc, char *argv[]);
 void logVerbose(char *buf, struct sockaddr_in s);
 int parseUserCommand(char *command);
@@ -98,8 +100,8 @@ int passwordsMatch(const char *userID, const char *userPW);
 int groupNamesMatch(const char *GID, const char *groupName);
 void sortGList(GROUPLIST *list);
 
-void getAuthorID(char *MessageDir, char *authorID);
-void getMessage(char *currMessageDir, char *message, size_t *msg_size);
+int getAuthorID(char *MessageDir, char *authorID);
+int getMessage(char *currMessageDir, char *message, size_t *msg_size);
 
 int readTCP(int fd, char *message, int maxSize, int flag);
 int timerOn(int fd);
