@@ -98,6 +98,11 @@ char *processClientTCP(int acceptfd, char *peekedMsg, int recvBytes)
         status = userPost(acceptfd, peekedMsg, recvBytes);
         response = createPostStatusMessage(status);
         break;
+    // case GROUP_RETRIEVE:
+    //     status = userRetrieve(acceptfd, peekedMsg, recvBytes);
+    //     response = createRetrieveStatusMessage(status);
+    default:
+        break;
     }
     return response;
 }
@@ -191,7 +196,7 @@ void handleTCP(int listenSocket)
             n = write(newTCPfd, serverBuf, strlen(serverBuf) + 1);
             if (n == -1)
             {
-                perror("[-] Server UDP failed on sendto");
+                perror("[-] Server TCP failed to write to client");
                 close(newTCPfd);
                 exit(EXIT_FAILURE);
             }

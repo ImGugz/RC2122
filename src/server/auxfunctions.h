@@ -98,6 +98,9 @@ int passwordsMatch(const char *userID, const char *userPW);
 int groupNamesMatch(const char *GID, const char *groupName);
 void sortGList(GROUPLIST *list);
 
+void getAuthorID(char *MessageDir, char *authorID);
+void getMessage(char *currMessageDir, char *message, size_t *msg_size);
+
 int readTCP(int fd, char *message, int maxSize, int flag);
 int timerOn(int fd);
 int timerOff(int fd);
