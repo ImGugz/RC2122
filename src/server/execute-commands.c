@@ -194,7 +194,6 @@ char *createGroupListMessage(char *code, int *groups, int num)
         {
             j = (groups == NULL) ? i : groups[i];
             sprintf(groupPath, "GROUPS/%s/MSG", dsGroups.groupinfo[j].no);
-            printf("groupPath: %s\n", groupPath);
             n = scandir(groupPath, &d, 0, alphasort);
             if (n < 0)
             {
@@ -661,7 +660,6 @@ void createRetrieveMessage(int acceptfd, char *peekedMsg)
         exit(EXIT_FAILURE);
     }
     temp[nTEMP] = '\0';
-    printf("temp: %s\n", temp);
     if (peekedMsg[strlen(peekedMsg) - 1] != '\n')
     { // every reply/request must end with \n
         fprintf(stderr, "[-] Wrong retrieve command received according to protocol.\n");
@@ -849,14 +847,12 @@ void createRetrieveMessage(int acceptfd, char *peekedMsg)
                 fileStream = fopen(msgFilePath, "rb");
                 sprintf(fileInfo, " / %s %ld ", msgFileName, fileLength);
                 sendTCP(acceptfd, fileInfo, strlen(fileInfo));
-                printf("Filename and file lenght: %s %ld\n", msgFileName, fileLength);
                 if (!sendFile(acceptfd, fileStream, fileLength))
                 {
                     failRetrieve(acceptfd, "NOK");
                 }
                 if (count == numMsgsRetrieve - 1)
                 {
-                    printf("I send in count = %d\n", count);
                     sendTCP(acceptfd, "\n", 1);
                 }
             }
@@ -875,6 +871,4 @@ void createRetrieveMessage(int acceptfd, char *peekedMsg)
         failRetrieve(acceptfd, "NOK");
     }
     userConfirmation[3] = '\0';
-    printf("This shit has %ld bytes\n", n_bytes);
-    printf("Read this shit: %s\n", userConfirmation);
 }

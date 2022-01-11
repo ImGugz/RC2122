@@ -3,6 +3,7 @@
 
 #include <regex.h>
 #include <stdio.h>
+#include <string.h>
 
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 

@@ -637,7 +637,6 @@ int sendData(int fd, unsigned char *buffer, size_t num)
         tmpBuf += n;
         num -= n;
     }
-    printf("[+] Sent %ld bytes\n", num);
     return 1;
 }
 
@@ -666,7 +665,6 @@ int sendFile(int fd, FILE *post, long lenFile)
             fclose(post);
             return 0;
         }
-        printf("Sent %ld out of %ld\n", num, lenFile);
         lenFile -= num;
         memset(buffer, 0, sizeof(buffer));
     } while (lenFile > 0);
@@ -742,7 +740,6 @@ void failRetrieve(int fd, char *buf)
 {
     char reply[3 + 1 + 3 + 1];
     sprintf(reply, "RRT %s\n", buf);
-    printf("Reply: %s", reply);
     write(fd, reply, 8);
     close(fd);
     exit(EXIT_FAILURE);

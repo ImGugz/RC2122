@@ -486,10 +486,8 @@ void exchangeTCPRet(char *message)
         exit(EXIT_FAILURE);
     }
     codeRRT[nTCP] = '\0';
-    printf("codeRRT: %s\n", codeRRT);
     if (strcmp(codeRRT, "RRT "))
     { // Wrong protocol message received
-        printf("yo\n");
         retrieveERR();
     }
 
@@ -499,7 +497,6 @@ void exchangeTCPRet(char *message)
         exit(EXIT_FAILURE);
     }
     statusRRT[nTCP] = '\0';
-    printf("statusRRT: %s\n", statusRRT);
     char discard[DISCARDCHAR_SIZE];
     if (!strcmp(statusRRT, "EOF") || !strcmp(statusRRT, "NOK"))
     {
@@ -512,7 +509,6 @@ void exchangeTCPRet(char *message)
         {
             retrieveERR();
         }
-        printf("discard 506: %s\n", discard);
     }
     int flag;
     char codeStatusRRT[RRT_CODE_SIZE + RRT_STATUS_SIZE + 1];
@@ -531,7 +527,6 @@ void exchangeTCPRet(char *message)
         exit(EXIT_FAILURE);
     }
     numMsgsRRT[nTCP] = '\0';
-    printf("numMsgsRRT: %s\n", numMsgsRRT);
     int numMsgs = atoi(numMsgsRRT);
     if (numMsgs >= 10)
     { // if there are more than 10 messages we must read an extra space in the case where there are < 10 messages
@@ -540,7 +535,6 @@ void exchangeTCPRet(char *message)
             exit(EXIT_FAILURE);
         }
         discard[nTCP] = '\0';
-        printf("discard: %s\n", discard);
         if (discard[0] != ' ')
         {
             retrieveERR();
@@ -662,7 +656,6 @@ void exchangeTCPRet(char *message)
             exit(EXIT_FAILURE);
         }
         discard[nTCP] = '\0';
-        printf("discard 660: %s\n", discard);
         if (isNumber(&discard[0]))
         { // it read the first digit of the next MID
             flagRRT = MSG_CONCAT;
@@ -677,7 +670,6 @@ void exchangeTCPRet(char *message)
                 exit(EXIT_FAILURE);
             }
             discard[nTCP] = '\0';
-            printf("discard 672: %s\n", discard);
             if (discard[0] != ' ')
             {
                 retrieveERR();
@@ -731,29 +723,22 @@ void exchangeTCPRet(char *message)
                 retrieveERR();
             }
             Fsize = atol(FsizeBuf);
-            printf("BANANA\n");
             recvFile(Fname, Fsize);
-            printf("PERAS\n");
             if ((nTCP = readTCP(discard, DISCARDCHAR_SIZE - 1, 0)) == -1)
             {
                 exit(EXIT_FAILURE);
             }
-            printf("I'm here\n");
             discard[nTCP] = '\0';
-            printf("discard 732: %s\n", discard);
             if (discard[0] != ' ' && discard[0] != '\n')
             { // read extra space in file or last message \n
-                printf("Bumbum\n");
                 retrieveERR();
             }
         }
         else
         { // wrong protocol message received
-            printf("Entered Here!\n");
             retrieveERR();
         }
     }
-    printf("FUUUUUUUUUUUUUCK!!!!!!!!!!!!!!!!!!!!!!!!\n");
     sendTCP("OK\n");
     closeTCPSocket();
 }
