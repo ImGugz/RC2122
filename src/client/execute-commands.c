@@ -7,18 +7,18 @@
 
 #include "execute-commands.h"
 
-#define USERID_SIZE 6    // len(UID) + 1
-#define USERPWD_SIZE 9   // len(UPW) + 1
-#define GID_SIZE 6       // len(GID) + 1
-#define MSGTXT_SIZE 241  // maxlen(MSGTXT) + 1
-#define MAXFN_SIZE 25    // maxlen(MSGFILE) + 1
-#define SERVMSG_SIZE 512 // 2 ^ (math.top(log_2(maxlen(MSG2SRV)))) = 2 ^ 9 (maxlen(MSG2SRV) comes from POST)
+#define USERID_SIZE 6        // len(UID) + 1
+#define USERPWD_SIZE 9       // len(UPW) + 1
+#define MAX_GID_SIZE 3       // len(GID) + 1
+#define MSGTXT_SIZE 241      // maxlen(MSGTXT) + 1
+#define MAX_FILENAME_SIZE 25 // maxlen(MSGFILE) + 1
+#define SERVMSG_SIZE 512     // 2 ^ (math.top(log_2(maxlen(MSG2SRV)))) = 2 ^ 9 (maxlen(MSG2SRV) comes from POST)
 
 // Logged in user's details
 char activeUser[USERID_SIZE] = "";
 char activeUserPwd[USERPWD_SIZE] = "";
 // Selected group
-char activeGID[GID_SIZE] = "";
+char activeGID[MAX_GID_SIZE] = "";
 
 char serverMessage[SERVMSG_SIZE] = ""; // Message that'll be sent to DS following the statement's protocol
 int userSession = LOGGED_OUT;          // Keeps user's account activity log (LOGGED IN OR LOGGED OUT)
@@ -362,7 +362,7 @@ void userPostGroup(char *command)
         return;
     }
     char messageText[MSGTXT_SIZE];
-    char fileName[MAXFN_SIZE] = "";
+    char fileName[MAX_FILENAME_SIZE] = "";
     sscanf(command, "post \"%240[^\"]\" %s", messageText, fileName);
     if (strlen(fileName) > 0)
     { // fileName was 'filled up' with something

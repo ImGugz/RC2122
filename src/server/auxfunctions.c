@@ -280,7 +280,7 @@ int userSubscribedToGroup(char *UID, char *GID)
     if (d)
     {
         struct dirent *dir;
-        char UIDtxt[MAX_UID_SIZE];
+        char UIDtxt[USERID_SIZE];
         while ((dir = readdir(d)) != NULL)
         {
             if (!strcmp(dir->d_name, ".") || !strcmp(dir->d_name, ".."))
@@ -291,8 +291,8 @@ int userSubscribedToGroup(char *UID, char *GID)
             {
                 continue;
             }
-            strncpy(UIDtxt, dir->d_name, MAX_UID_SIZE - 1); // copy only 5 characters (len(UID))
-            UIDtxt[MAX_UID_SIZE - 1] = '\0';
+            strncpy(UIDtxt, dir->d_name, USERID_SIZE - 1); // copy only 5 characters (len(UID))
+            UIDtxt[USERID_SIZE - 1] = '\0';
             if (!strcmp(UIDtxt, UID))
             {
                 return 1;
@@ -319,11 +319,11 @@ int passwordsMatch(const char *userID, const char *userPW)
         return 0;
     }
 
-    password = calloc(sizeof(char), USERPW_SIZE + 1);
+    password = calloc(sizeof(char), USERPWD_SIZE);
 
     if (password)
     {
-        n = fread(password, 1, USERPW_SIZE, fPtr);
+        n = fread(password, 1, USERPWD_SIZE - 1, fPtr);
         if (n == -1)
         {
             fprintf(stderr, "[-] Failed to read from password file.\n");
@@ -514,7 +514,7 @@ char *createMessageInGroup(char *GID, char *UID, char *msgText, int msgTextSize)
         perror("[-] Post failed to create new msg author file");
         return NULL;
     }
-    if (fwrite(UID, sizeof(char), MAX_UID_SIZE - 1, author) != MAX_UID_SIZE - 1)
+    if (fwrite(UID, sizeof(char), USERID_SIZE - 1, author) != USERID_SIZE - 1)
     {
         perror("[-] Post failed to write on new message author file");
         return NULL;

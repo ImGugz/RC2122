@@ -42,7 +42,7 @@ int userRegister(char **tokenList, int numTokens)
         fprintf(stderr, "[-] Unable to create file.\n");
         return NOK;
     }
-    if (fwrite(tokenList[2], sizeof(char), USERPW_SIZE, fPtr) != USERPW_SIZE)
+    if (fwrite(tokenList[2], sizeof(char), USERPWD_SIZE - 1, fPtr) != USERPWD_SIZE - 1)
     {
         fprintf(stderr, "[-] Writing password to file failed.\n");
         return NOK;
@@ -531,7 +531,7 @@ char *createUsersInGroupMessage(int acceptfd, char *peekedMsg)
     if (d)
     {
         struct dirent *dir;
-        char UIDtxt[MAX_UID_SIZE];
+        char UIDtxt[USERID_SIZE];
         tmp = (char *)calloc(sizeof(char), INITIAL_ULBUF_SIZE + 1); // 10 users
         if (!tmp)
         {
@@ -551,11 +551,11 @@ char *createUsersInGroupMessage(int acceptfd, char *peekedMsg)
             {
                 continue;
             }
-            strncpy(UIDtxt, dir->d_name, MAX_UID_SIZE - 1);
-            UIDtxt[MAX_UID_SIZE - 1] = '\0';
+            strncpy(UIDtxt, dir->d_name, USERID_SIZE - 1);
+            UIDtxt[USERID_SIZE - 1] = '\0';
             if (validUID(UIDtxt))
             {
-                if (curr + MAX_UID_SIZE >= len)
+                if (curr + USERID_SIZE >= len)
                 {
                     char *newPtr = (char *)realloc(users, len + 6 * 10); // 10 more users
                     if (newPtr == NULL)
@@ -565,7 +565,7 @@ char *createUsersInGroupMessage(int acceptfd, char *peekedMsg)
                         return strdup("RUL NOK\n");
                     }
                     users = newPtr;
-                    len += MAX_UID_SIZE * 10;
+                    len += USERID_SIZE * 10;
                 }
                 curr += sprintf(users + curr, "%s ", UIDtxt);
             }
@@ -578,7 +578,7 @@ char *createUsersInGroupMessage(int acceptfd, char *peekedMsg)
 char *userPost(int acceptfd, char *peekedMsg, int recvBytes)
 {
     char clientBuf[MAX_RECVTCP_SIZE];
-    char givenUID[MAX_UID_SIZE], givenGID[MAX_GID_SIZE], givenTextSize[MAX_TEXTSZ_SIZE], givenText[MAX_PSTTEXT_SIZE];
+    char givenUID[USERID_SIZE], givenGID[MAX_GID_SIZE], givenTextSize[MAX_TEXTSZ_SIZE], givenText[MAX_PSTTEXT_SIZE];
     int textSize;
     sscanf(peekedMsg, "PST %s %s %s ", givenUID, givenGID, givenTextSize); // assumes at least offset bytes will come
     textSize = atoi(givenTextSize);
@@ -651,7 +651,7 @@ char *userPost(int acceptfd, char *peekedMsg, int recvBytes)
 
 void createRetrieveMessage(int acceptfd, char *peekedMsg)
 {
-    char UID[MAX_UID_SIZE], GID[MAX_GID_SIZE], MID[MAX_MID_SIZE];
+    char UID[USERID_SIZE], GID[MAX_GID_SIZE], MID[MAX_MID_SIZE];
     char temp[300];
     sscanf(peekedMsg, "RTV %s %s %s", UID, GID, MID);
     int nTEMP;
