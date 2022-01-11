@@ -1,5 +1,1 @@
-<<<<<<< HEAD
 The Battle of Actium was a naval battle fought between a maritime fleet led by Octavian and the combined fleets of both Mark Anthony and Cleopatra VII Philopator. The battle took place on 2 September 31BC in the Ionian Sea.
-=======
-The Battle of Actium was a naval battle fought between a maritime fleet led by Octavien and the combined fleets of both Mark Anthony and Cleopatra VII Philopator. The battle took place on 2 September 31BC in the Ionian Sea.
->>>>>>> 3364039a8a2a6437719f3ad5d7a947f71dcc6fe6

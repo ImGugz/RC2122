@@ -81,7 +81,7 @@ char *createPostStatusMessage(char *status)
 char *processClientTCP(int acceptfd, char *peekedMsg, int recvBytes)
 {
     char opMsg[4];
-    char *response;
+    char *response = NULL;
     char *status;
     sscanf(peekedMsg, "%3s", opMsg);
     int op = parseUserCommand(opMsg);
@@ -98,10 +98,8 @@ char *processClientTCP(int acceptfd, char *peekedMsg, int recvBytes)
         status = userPost(acceptfd, peekedMsg, recvBytes);
         response = createPostStatusMessage(status);
         break;
-    // case GROUP_RETRIEVE:
-    //     status = userRetrieve(acceptfd, peekedMsg, recvBytes);
-    //     response = createRetrieveStatusMessage(status);
-    default:
+    case GROUP_RETRIEVE:
+        createRetrieveMessage(acceptfd, peekedMsg);
         break;
     }
     return response;
@@ -193,10 +191,16 @@ void handleTCP(int listenSocket)
                 logVerbose(clientBuf, cliaddr);
             }
             serverBuf = processClientTCP(newTCPfd, clientBuf, n);
+            if (serverBuf == NULL)
+            {
+                write(newTCPfd, "\n", 1);
+                close(newTCPfd);
+                exit(EXIT_SUCCESS);
+            }
             n = write(newTCPfd, serverBuf, strlen(serverBuf) + 1);
             if (n == -1)
             {
-                perror("[-] Server TCP failed to write to client");
+                perror("[-] Server UDP failed on sendto");
                 close(newTCPfd);
                 exit(EXIT_FAILURE);
             }

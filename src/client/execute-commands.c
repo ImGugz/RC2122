@@ -63,12 +63,6 @@ void userUnregister(char **tokenList, int numTokens)
         fprintf(stderr, "[-] Invalid unregister command arguments. Please check given UID and/or password and try again.\n");
         return;
     }
-    if (userSession == LOGGED_IN && !strcmp(activeUser, tokenList[1]))
-    {
-        userSession = LOGGED_OUT;
-        memset(activeUser, 0, sizeof(activeUser));
-        memset(activeUserPwd, 0, sizeof(activeUserPwd));
-    }
     sprintf(serverMessage, "UNR %s %s\n", tokenList[1], tokenList[2]);
     exchangeUDPMsg(serverMessage);
 }
@@ -404,7 +398,6 @@ void userPostGroup(char *command)
         }
         sprintf(serverMessage, "PST %s %s %ld %s %s %ld ", activeUser, activeGID, strlen(messageText), messageText, fileName, lenFile);
         exchangeTCPPost(serverMessage, post, lenFile);
-        fclose(post);
     }
     else
     {

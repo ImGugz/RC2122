@@ -75,7 +75,7 @@ void parseArgs(int argc, char *argv[])
         {
         case 'p':
             if (strcmp(optarg, "-v") == 0)
-            { // corner case (./DS -p -v)
+            { // corner case (./user -p -v)
                 fprintf(stderr, "[-] Usage: ./DS [-p DSport] [-v].\n");
                 exit(EXIT_FAILURE);
             }
@@ -155,6 +155,8 @@ int parseUserCommand(char *command)
         return USERS_LIST;
     else if (strcmp(command, "PST") == 0)
         return GROUP_POST;
+    else if (strcmp(command, "RTV") == 0)
+        return GROUP_RETRIEVE;
     else
     {
         fprintf(stderr, "[-] Invalid protocol command code received. Please try again.\n");
@@ -197,29 +199,6 @@ char *createStatusMessage(char *command, int statusCode)
     }
 
     return strdup(status);
-}
-
-int unsubscribeUserGroups(char *UID)
-{
-    DIR *d;
-    struct dirent *group;
-    char userSubscribedFile[268];
-
-    if ((d = opendir("GROUPS")) < 0)
-        return 0;
-
-    while (group = readdir(d))
-    {
-        sprintf(userSubscribedFile, "GROUPS/%s/%s.txt", group->d_name, UID);
-        if (unlink(userSubscribedFile) != 0 && errno != ENOENT)
-        {
-            free(d);
-            return 0;
-        }
-    }
-
-    free(d);
-    return 1;
 }
 
 char *createSubscribeMessage(int statusCode, char *GID)
@@ -290,6 +269,38 @@ int directoryExists(const char *path)
     if (stat(path, &stats))
         return 0;
     return S_ISDIR(stats.st_mode);
+}
+
+int userSubscribedToGroup(char *UID, char *GID)
+{
+    char groupDirName[GROUPDIR_SIZE];
+    sprintf(groupDirName, "GROUPS/%s", GID);
+    DIR *d;
+    d = opendir(groupDirName);
+    if (d)
+    {
+        struct dirent *dir;
+        char UIDtxt[MAX_UID_SIZE];
+        while ((dir = readdir(d)) != NULL)
+        {
+            if (!strcmp(dir->d_name, ".") || !strcmp(dir->d_name, ".."))
+            {
+                continue;
+            }
+            if (strlen(dir->d_name) != 9) // UID + 1 + 3
+            {
+                continue;
+            }
+            strncpy(UIDtxt, dir->d_name, MAX_UID_SIZE - 1); // copy only 5 characters (len(UID))
+            UIDtxt[MAX_UID_SIZE - 1] = '\0';
+            if (!strcmp(UIDtxt, UID))
+            {
+                return 1;
+            }
+        }
+    }
+    free(d);
+    return 0;
 }
 
 int passwordsMatch(const char *userID, const char *userPW)
@@ -395,6 +406,11 @@ int compare(const void *a, const void *b)
 void sortGList(GROUPLIST *list)
 {
     qsort(list->groupinfo, list->no_groups, sizeof(GROUPINFO), compare);
+}
+
+int invsort(const struct dirent **a, const struct dirent **b)
+{
+    return -strcoll((*a)->d_name, (*b)->d_name);
 }
 
 void fillGroupsInfo()
@@ -583,6 +599,19 @@ int readFile(int fd, char *GID, char *MID, char *fileName, long int fileSize)
     return 1;
 }
 
+int numMessagesToRetrieve(struct dirent **d, int n, char *MID)
+{
+    int count = 0;
+    while (n--)
+    {
+        if (d[n]->d_type == DT_DIR && validMID(d[n]->d_name) && atoi(d[n]->d_name) >= atoi(MID))
+        {
+            count++;
+        }
+    }
+    return count;
+}
+
 int compareIDs(const void *a, const void *b)
 {
     return *(int *)a - *(int *)b;
@@ -591,6 +620,79 @@ int compareIDs(const void *a, const void *b)
 int validGName(char *gName)
 {
     return validRegex(gName, "^[a-zA-Z0-9_-]{1,24}$");
+}
+
+int sendData(int fd, unsigned char *buffer, size_t num)
+{
+    unsigned char *tmpBuf = buffer;
+    ssize_t n;
+    while (num > 0)
+    {
+        n = write(fd, tmpBuf, num);
+        if (n == -1)
+        {
+            perror("[-] Failed to send file data via TCP");
+            return 0;
+        }
+        tmpBuf += n;
+        num -= n;
+    }
+    printf("[+] Sent %ld bytes\n", num);
+    return 1;
+}
+
+/**
+ * @brief Sends a file via TCP.
+ *
+ * @param post file stream of the file being sent
+ * @param lenFile number of bytes in file being sent
+ * @return 1 if file was sent and 0 otherwise
+ */
+int sendFile(int fd, FILE *post, long lenFile)
+{
+    unsigned char buffer[4096] = "";
+    do
+    {
+        size_t num = MIN(lenFile, sizeof(buffer)); // sizeof(buffer)-1 so it only reads 1024 worst case and buffer[num] = '\n' doesn't SIGSEGV
+        num = fread(buffer, sizeof(unsigned char), num, post);
+        if (num < 1)
+        {
+            fprintf(stderr, "[-] Failed on reading the given file. Please try again.\n");
+            fclose(post);
+            return 0;
+        }
+        if (!sendData(fd, buffer, num))
+        {
+            fclose(post);
+            return 0;
+        }
+        printf("Sent %ld out of %ld\n", num, lenFile);
+        lenFile -= num;
+        memset(buffer, 0, sizeof(buffer));
+    } while (lenFile > 0);
+    return 1;
+}
+
+/**
+ * @brief Sends a message via TCP.
+ *
+ * @param message message to be sent
+ */
+void sendTCP(int fd, char *message, int bytes)
+{
+    int bytesSent = 0;
+    ssize_t nSent;
+    while (bytesSent < bytes)
+    { // Send initial message
+        nSent = send(fd, message + bytesSent, bytes - bytesSent, 0);
+        if (nSent == -1)
+        {
+            perror("[-] Failed to write on TCP");
+            close(fd);
+            exit(EXIT_FAILURE);
+        }
+        bytesSent += nSent;
+    }
 }
 
 /**
@@ -636,87 +738,14 @@ int readTCP(int fd, char *message, int maxSize, int flag)
     return bytesRecv;
 }
 
-int getAuthorID(char *messageDir, char *authorID)
+void failRetrieve(int fd, char *buf)
 {
-    FILE *fPtr;
-    char authorFileName[GROUPNEWMSGAUT_SIZE];
-    size_t n;
-
-    sprintf(authorFileName, "%s/A U T H O R", messageDir);
-
-    fPtr = fopen(authorFileName, "r");
-    if (fPtr == NULL)
-    {
-        fprintf(stderr, "[-] Unable to open author file.\n");
-        return 0;
-    }
-
-    authorID = calloc(sizeof(char), MAX_UID_SIZE);
-
-    if (authorID)
-    {
-        n = fread(authorID, 1, MAX_UID_SIZE - 1, fPtr);
-        if (n == -1)
-        {
-            fprintf(stderr, "[-] Failed to read from author file.\n");
-            return 0;
-        }
-    }
-    else
-    {
-        fprintf(stderr, "[-] Failed to allocate memory for author.\n");
-        return 0;
-    }
-    authorID[n] = '\0';
-    if (fclose(fPtr) == -1)
-    {
-        fprintf(stderr, "[-] Failed to close author file.\n");
-        return 0;
-    }
-
-    return 1;
-}
-
-int getMessage(char *currMessageDir, char *message, size_t *msg_size)
-{
-    FILE *fPtr;
-    char messageFileName[GROUPNEWMSGTXT_SIZE];
-    size_t n;
-
-    sprintf(messageFileName, "%s/T E X T.txt", currMessageDir);
-    fPtr = fopen(messageFileName, "r");
-    if (fPtr == NULL)
-    {
-        fprintf(stderr, "[-] Unable to open author file.\n");
-        return 0;
-    }
-
-    fseek(fPtr, 0, SEEK_END);
-    *msg_size = ftell(fPtr);
-    fseek(fPtr, 0, SEEK_SET);
-
-    message = calloc(sizeof(char), *msg_size);
-
-    if (message)
-    {
-        n = fread(message, 1, *msg_size, fPtr);
-        if (n == -1)
-        {
-            fprintf(stderr, "[-] Failed to read from message file.\n");
-            return 0;
-        }
-    }
-    else
-    {
-        fprintf(stderr, "[-] Failed to allocate memory for message.\n");
-        return 0;
-    }
-    message[n] = '\0';
-    if (fclose(fPtr) == -1)
-    {
-        fprintf(stderr, "[-] Failed to close message file.\n");
-        return 0;
-    }
+    char reply[3 + 1 + 3 + 1];
+    sprintf(reply, "RRT %s\n", buf);
+    printf("Reply: %s", reply);
+    write(fd, reply, 8);
+    close(fd);
+    exit(EXIT_FAILURE);
 }
 
 int timerOn(int fd)

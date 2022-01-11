@@ -51,6 +51,8 @@
 #define MAX_FILEINFO_SIZE 37
 #define MAX_FILENAME_SIZE 25
 #define MAX_FILESZ_SIZE 11
+#define DIRENTDIR_SIZE 257
+#define RTVBUF_SIZE 280
 
 #define MIN(x, y) (((x) < (y)) ? (x) : (y)) // Macro to determine min(x, y)
 
@@ -79,8 +81,6 @@ int validGName(char *gName);
 int validFilename(char *fName);
 int validRegex(char *buf, char *reg);
 
-int unsubscribeUserGroups(char *UID);
-
 void parseArgs(int argc, char *argv[]);
 void logVerbose(char *buf, struct sockaddr_in s);
 int parseUserCommand(char *command);
@@ -90,20 +90,24 @@ char *createMessageInGroup(char *GID, char *UID, char *msgText, int msgTextSize)
 int readFile(int fd, char *GID, char *MID, char *fileName, long int fileSize);
 
 int compareIDs(const void *a, const void *b);
+int invsort(const struct dirent **a, const struct dirent **b);
+int numMessagesToRetrieve(struct dirent **d, int n, char *MID);
 
 char *createStatusMessage(char *command, int status);
 char *createSubscribeMessage(int statusCode, char *GID);
 
 int removeDirectory(const char *path);
 int directoryExists(const char *path);
+int userSubscribedToGroup(char *UID, char *GID);
 int passwordsMatch(const char *userID, const char *userPW);
 int groupNamesMatch(const char *GID, const char *groupName);
 void sortGList(GROUPLIST *list);
+void failRetrieve(int fd, char *msg);
 
-int getAuthorID(char *MessageDir, char *authorID);
-int getMessage(char *currMessageDir, char *message, size_t *msg_size);
-
+void sendTCP(int fd, char *message, int bytes);
 int readTCP(int fd, char *message, int maxSize, int flag);
+int sendData(int fd, unsigned char *buffer, size_t num);
+int sendFile(int fd, FILE *post, long lenFile);
 int timerOn(int fd);
 int timerOff(int fd);
 

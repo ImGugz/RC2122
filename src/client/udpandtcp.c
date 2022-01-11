@@ -12,17 +12,20 @@
 #define DSSTATUS_SIZE 8     // maxlen(status code) + 1 = len(E_GNAME) + 1
 #define UDP_RECVF_SIZE 4096 // 2 ^ math.top(log_2(3274)) (maxlen(glcmd) = 3274)
 #define TCP_READ_SIZE 512   // Arbitrary
+#define MAX_RPT_SIZE 10
 
-#define MAX_RPT_SIZE 10     // maxlen(rpt xxxx\n) + 1
-#define RRT_CODESTAT_SIZE 8 // maxlen(rrt) + 1 (RRT NOK\n)
-#define MAX_NUMRRT_SIZE 3   // maxlen(20) + 1
-#define BACKSPACE_SIZE 2    // len(' ') + 1
-#define RRT_BUFFER_SIZE 256 // arbitrary
-#define SLASH_MID_SIZE 5    // max(1, 4) + 1
-#define UID_FNAME_SIZE 25   // max(5, 24) + 1
-#define FILE_TEXT_SIZE 11   // max(3, 10) + 1
-#define MAX_TEXT_SIZE 242   // maxlen(text) + backspace + 1
-#define BACKSPACE 1         // used for avoiding meaningless "+1" in offset calcs
+#define RRT_CODE_SIZE 4
+#define RRT_STATUS_SIZE 4
+#define MAX_NUMRRT_SIZE 3  // maxlen(20) + 1
+#define DISCARDCHAR_SIZE 2 // len(' ') + 1
+#define RRTMID_SIZE 5
+#define RRTUID_SIZE 6
+#define RRTTXTSZ_SIZE 4
+#define RRTTEXT_SIZE 241
+#define RRTFILENAME_SIZE 25
+#define RRTFILESZ_SIZE 11
+#define MSG_OK 0
+#define MSG_CONCAT 1
 
 int fdDSUDP, fdDSTCP;
 int errcode;
@@ -401,6 +404,11 @@ void exchangeTCPPost(char *message, FILE *post, long lenFile)
     { // sendFile already handles proper pre-exiting operations (close file stream, socket fd's, etc)
         exit(EXIT_FAILURE);
     }
+    if (fclose(post) == -1)
+    {
+        perror("[-] Failed to close posted file.");
+        exit(EXIT_FAILURE);
+    }
     char msgRecvBuf[MAX_RPT_SIZE];
     if ((nTCP = readTCP(msgRecvBuf, MAX_RPT_SIZE - 1, 0)) == -1)
     { // readTCP already closes socket's fds upon error
@@ -408,23 +416,16 @@ void exchangeTCPPost(char *message, FILE *post, long lenFile)
         exit(EXIT_FAILURE);
     }
     msgRecvBuf[nTCP] = '\0'; // will never SIGSEGV
-    logTCPServer(msgRecvBuf);
     processTCPMsg(msgRecvBuf, NULL);
     closeTCPSocket();
 }
 
-in_port_t get_in_port(struct sockaddr *sa)
-{ // TODO: DELETE
-    if (sa->sa_family == AF_INET)
-        return (((struct sockaddr_in *)sa)->sin_port);
-
-    return (((struct sockaddr_in6 *)sa)->sin6_port);
-}
-
-void logTCPServer(char *message)
-{ // TODO: DELETE
-    struct sockaddr_in *addr = (struct sockaddr_in *)resTCP->ai_addr;
-    printf("[!] Server @ %s in port %d sent: %s", inet_ntoa(((struct in_addr)addr->sin_addr)), ntohs(get_in_port((struct sockaddr *)resTCP->ai_addr)), message);
+void retrieveERR()
+{
+    fprintf(stderr, "[-] Wrong protocol message received on retrieve. Program will now exit.\n");
+    closeUDPSocket();
+    closeTCPSocket();
+    exit(EXIT_FAILURE);
 }
 
 /**
@@ -467,142 +468,293 @@ void exchangeTCPMsg(char *message)
         bytesRecv += nTCP;
     }
     listRecvBuf[bytesRecv] = '\0'; // will never SIGSEGV (worst case when it gets here bytesRecv = lenBuf-1)
-    logTCPServer(listRecvBuf);
     processTCPMsg(listRecvBuf, NULL);
     free(listRecvBuf);
     closeTCPSocket();
 }
 
-/**
- * @brief Sends and receives message to/from DS via TCP regarding to the RETRIEVE command following the statement's protocol.
- *
- * @param message User RETRIEVE message that follows the statement's protocol.
- */
 void exchangeTCPRet(char *message)
 {
-    char codeStatus[RRT_CODESTAT_SIZE], numRRTMsgs[MAX_NUMRRT_SIZE], backspace[BACKSPACE_SIZE];
-    char rrtBuf[RRT_BUFFER_SIZE], textBuf[MAX_TEXT_SIZE];
-    char slashOrMID[SLASH_MID_SIZE], fileNameOrUID[UID_FNAME_SIZE], textOrFileSize[FILE_TEXT_SIZE];
-    char *rrtOffset, *temp;
-    size_t offset;
+    char codeRRT[RRT_CODE_SIZE + 1];
+    char statusRRT[RRT_STATUS_SIZE];
     connectTCPSocket();
     sendTCP(message);
-    if ((nTCP = readTCP(codeStatus, RRT_CODESTAT_SIZE - 1, 0)) == -1)
-    { // Read code and status
+
+    // Read the code (RRT)
+    if ((nTCP = readTCP(codeRRT, RRT_CODE_SIZE, 0)) == -1)
+    {
         exit(EXIT_FAILURE);
     }
-    codeStatus[nTCP] = '\0'; // \n will be ignored (irrelevant) -> will never SIGSEGV
-    logTCPServer(codeStatus);
+    codeRRT[nTCP] = '\0';
+    printf("codeRRT: %s\n", codeRRT);
+    if (strcmp(codeRRT, "RRT "))
+    { // Wrong protocol message received
+        printf("yo\n");
+        retrieveERR();
+    }
+
+    // Read the status (OK/NOK)
+    if ((nTCP = readTCP(statusRRT, RRT_STATUS_SIZE - 1, 0)) == -1)
+    {
+        exit(EXIT_FAILURE);
+    }
+    statusRRT[nTCP] = '\0';
+    printf("statusRRT: %s\n", statusRRT);
+    char discard[DISCARDCHAR_SIZE];
+    if (!strcmp(statusRRT, "EOF") || !strcmp(statusRRT, "NOK"))
+    {
+        if ((nTCP = readTCP(discard, DISCARDCHAR_SIZE - 1, 0)) == -1)
+        {
+            exit(EXIT_FAILURE);
+        }
+        discard[nTCP] = '\0';
+        if (discard[nTCP - 1] != '\n')
+        {
+            retrieveERR();
+        }
+        printf("discard 506: %s\n", discard);
+    }
     int flag;
-    processTCPMsg(codeStatus, &flag); // flag as pointer to be set in processTCPMsg function
+    char codeStatusRRT[RRT_CODE_SIZE + RRT_STATUS_SIZE + 1];
+    sprintf(codeStatusRRT, "%s %s", codeRRT, statusRRT);
+    processTCPMsg(codeStatusRRT, &flag);
     if (!flag)
-    { // flag = 1 : messages to retrieve, flag = 0 : no messages to retrieve/error
+    { // if it gets here then either RRT NOK or RRT EOF
         closeTCPSocket();
         return;
     }
-    if ((nTCP = readTCP(numRRTMsgs, MAX_NUMRRT_SIZE - 1, 0)) == -1)
-    { // Read number of messages to read
+
+    // Read the number of messages to retrieve
+    char numMsgsRRT[MAX_NUMRRT_SIZE];
+    if ((nTCP = readTCP(numMsgsRRT, MAX_NUMRRT_SIZE - 1, 0)) == -1)
+    {
         exit(EXIT_FAILURE);
     }
-    numRRTMsgs[nTCP] = '\0'; // will never SIGSEGV
-    logTCPServer(numRRTMsgs);
-    if (atoi(numRRTMsgs) >= 10)
-    { // if there are more than 10 messages we must read an extra space to match the pointer
-        // in the case where there are < 10 messages
-        if ((nTCP = readTCP(backspace, BACKSPACE_SIZE - 1, 0)) == -1)
+    numMsgsRRT[nTCP] = '\0';
+    printf("numMsgsRRT: %s\n", numMsgsRRT);
+    int numMsgs = atoi(numMsgsRRT);
+    if (numMsgs >= 10)
+    { // if there are more than 10 messages we must read an extra space in the case where there are < 10 messages
+        if ((nTCP = readTCP(discard, DISCARDCHAR_SIZE - 1, 0)) == -1)
         {
             exit(EXIT_FAILURE);
         }
-        backspace[nTCP] = '\0'; // will never SIGSEGV
-        logTCPServer(backspace);
+        discard[nTCP] = '\0';
+        printf("discard: %s\n", discard);
+        if (discard[0] != ' ')
+        {
+            retrieveERR();
+        }
     }
-    int nMsg = atoi(numRRTMsgs);
-    if (nMsg == 1)
+    if (numMsgs == 1)
     {
-        printf("[+] %d message to display: (-> MID: text \\(Fname - Fsize)):\n", nMsg);
+        printf("[+] %d message to display: (-> MID: text \\(Fname - Fsize)):\n", numMsgs);
     }
     else
     {
-        printf("[+] %d messages to display: (-> MID: text \\(Fname - Fsize)):\n", nMsg);
+        printf("[+] %d messages to display: (-> MID: text \\(Fname - Fsize)):\n", numMsgs);
     }
-    while (1)
+    int flagRRT = MSG_OK;
+    char MID[RRTMID_SIZE] = "", UID[RRTUID_SIZE] = "", TsizeBuf[RRTTXTSZ_SIZE] = "", Text[RRTTEXT_SIZE + 1] = "";
+    char Fname[RRTFILENAME_SIZE] = "", FsizeBuf[RRTFILESZ_SIZE] = "";
+    int Tsize;
+    long Fsize;
+    int j;
+    for (int i = 1; i <= numMsgs; ++i)
     {
-        memset(textBuf, 0, sizeof(textBuf));
-        memset(rrtBuf, 0, sizeof(rrtBuf));
-        nTCP = readTCP(rrtBuf, RRT_BUFFER_SIZE - 1, MSG_PEEK); // Assumes at least offset bytes will come (few) -> EXTREMELY RELIABLE
-        if (nTCP == -1)
+        memset(MID, 0, sizeof(MID));
+        memset(UID, 0, sizeof(UID));
+        memset(TsizeBuf, 0, sizeof(TsizeBuf));
+        memset(Text, 0, sizeof(Text));
+        memset(Fname, 0, sizeof(Fname));
+        memset(FsizeBuf, 0, sizeof(FsizeBuf));
+        // Read MID
+        if (flagRRT == MSG_OK)
+        { // if flag is MSG_OK then we read a normal MID
+            if ((nTCP = readTCP(MID, RRTMID_SIZE, 0)) == -1)
+            { // RRTMID_SIZE to also read backspace
+                exit(EXIT_FAILURE);
+            }
+            MID[nTCP - 1] = '\0';
+            printf("MID: %s\n", MID);
+            if (!validMID(MID))
+            {
+                retrieveERR();
+            }
+            printf("-> %s: ", MID);
+        }
+        else if (flagRRT == MSG_CONCAT)
+        { // if flag is MSG_CONCAT then we must concat a character read previously to MID
+            strcat(MID, discard);
+            printf("MID 2.1: %s\n", MID);
+            char *ptrMID = MID + 1;
+            if ((nTCP = readTCP(ptrMID, RRTMID_SIZE - 1, 0)) == -1)
+            { // RRTMID_SIZE-1 because discard contains first character and to also read backspace
+                exit(EXIT_FAILURE);
+            }
+            printf("MID 2.2: %s\n", MID);
+            MID[nTCP] = '\0';
+            printf("MID 2.3: %s\n", MID);
+            if (!validMID(MID))
+            {
+                retrieveERR();
+            }
+            printf("-> %s: ", MID);
+        }
+
+        // Read UID
+        if ((nTCP = readTCP(UID, RRTUID_SIZE, 0)) == -1)
+        { // RRTMID_SIZE to also read backspace
+            exit(EXIT_FAILURE);
+        }
+        UID[nTCP - 1] = '\0';
+        printf("UID: %s\n", UID);
+        if (!validUID(UID))
+        {
+            retrieveERR();
+        }
+
+        // Read text size
+        for (j = 0; j < RRTTXTSZ_SIZE; ++j)
+        {
+            if ((nTCP = readTCP(discard, DISCARDCHAR_SIZE - 1, 0)) == -1)
+            {
+                exit(EXIT_FAILURE);
+            }
+            if (discard[0] != ' ')
+            { // anything other than the space we'll append or new line if retrieve message ends with text
+                strcat(TsizeBuf, &discard[0]);
+            }
+            else
+            { // space has been read
+                break;
+            }
+        }
+        TsizeBuf[j] = '\0';
+        printf("TsizeBuf: %s\n", TsizeBuf);
+        if (discard[0] != ' ' || !isNumber(TsizeBuf))
+        { // make sure space was read and Tsize is a number - otherwise wrong protocol message received
+            retrieveERR();
+        }
+        Tsize = atoi(TsizeBuf);
+
+        // Read text
+        if ((nTCP = readTCP(Text, Tsize + 1, 0)) == -1)
         {
             exit(EXIT_FAILURE);
         }
-        rrtBuf[nTCP] = '\0';
-        logTCPServer(rrtBuf);
-        if (nTCP == 0 || (nTCP == 1 && rrtBuf[0] == '\n'))
-        { // nothing else to read
+        Text[nTCP] = '\0';
+        printf("Text: %s\n", Text);
+        if ((Text[Tsize] != ' ') && (Text[Tsize] != '\n'))
+        { // wrong protocol message received -> either it ends or has a file
+            retrieveERR();
+        }
+        if (Text[Tsize] == '\n')
+        { // end of reply has been made - remove new line on printing
+            Text[Tsize] = '\0';
+            printf("%s\n", Text);
             break;
         }
-        sscanf(rrtBuf, "%s %s %s", slashOrMID, fileNameOrUID, textOrFileSize);
-        offset = strlen(slashOrMID) + BACKSPACE + strlen(fileNameOrUID) + BACKSPACE + strlen(textOrFileSize) + BACKSPACE;
-        temp = (char *)calloc(sizeof(char), offset + 1);
-        if (temp == NULL)
+        printf("%s\n", Text);
+        // Read next character -> either it's a slash(/) or the first char of a MID
+        if ((nTCP = readTCP(discard, DISCARDCHAR_SIZE - 1, 0)) == -1)
         {
-            fprintf(stderr, "[-] Error allocating memory in heap. Please try again.\n");
-            closeTCPSocket();
-            return;
-        }
-        rrtOffset = temp;
-        if ((nTCP = readTCP(rrtOffset, offset, 0)) == -1)
-        { // Read offset bytes to start reading text/file data
-            free(rrtOffset);
             exit(EXIT_FAILURE);
         }
-        rrtOffset[nTCP] = '\0';
-        logTCPServer(rrtOffset);
-        free(temp);
-        temp = NULL;
-        long bytesToRead = atol(textOrFileSize);
-        if (validMID(slashOrMID))
-        { // Text case
-            if (!(validMID(slashOrMID) && validUID(fileNameOrUID) && bytesToRead <= 240))
-            {
-                fprintf(stderr, "[-] Wrong protocol message received on retrieve. Program will now exit.\n");
-                closeUDPSocket();
-                closeTCPSocket();
-                exit(EXIT_FAILURE);
-            }
-            if ((nTCP = readTCP(textBuf, bytesToRead + BACKSPACE, 0)) == -1)
-            { // bytesToRead + 1 to read extra space
-                exit(EXIT_FAILURE);
-            }
-            textBuf[nTCP - 1] = '\0'; // will never SIGSEGV (-1 because of extra space read)
-            logTCPServer(textBuf);
-            printf("-> %s: %s\n", slashOrMID, textBuf);
+        discard[nTCP] = '\0';
+        printf("discard 660: %s\n", discard);
+        if (isNumber(&discard[0]))
+        { // it read the first digit of the next MID
+            flagRRT = MSG_CONCAT;
         }
-        else if (strlen(slashOrMID) == 1 && slashOrMID[0] == '/')
-        { // File case
-            if (!(validFilename(fileNameOrUID) && strlen(textOrFileSize) <= 10))
+        else if (discard[0] == '/')
+        { // there's a file to be read
+            flagRRT = MSG_OK;
+
+            // Read backspace
+            if ((nTCP = readTCP(discard, DISCARDCHAR_SIZE - 1, 0)) == -1)
             {
-                fprintf(stderr, "[-] Wrong protocol message received on retrieve. Program will now exit.\n");
-                closeUDPSocket();
-                closeTCPSocket();
                 exit(EXIT_FAILURE);
             }
-            recvFile(fileNameOrUID, bytesToRead);
-            printf("(%s - %s bytes)\n", fileNameOrUID, textOrFileSize);
-            if ((nTCP = readTCP(backspace, BACKSPACE_SIZE - 1, 0)) == -1)
-            { // Update stream pointer consistency
+            discard[nTCP] = '\0';
+            printf("discard 672: %s\n", discard);
+            if (discard[0] != ' ')
+            {
+                retrieveERR();
+            }
+
+            // Read filename
+            for (j = 0; j < RRTFILENAME_SIZE; ++j)
+            {
+                if ((nTCP = readTCP(discard, DISCARDCHAR_SIZE - 1, 0)) == -1)
+                {
+                    exit(EXIT_FAILURE);
+                }
+                if (discard[0] != ' ')
+                { // anything other than the space we'll append
+                    strcat(Fname, &discard[0]);
+                }
+                else
+                { // space has been read
+                    break;
+                }
+            }
+            Fname[j] = '\0';
+            printf("Fname: %s\n", Fname);
+            if (discard[0] != ' ' || !validFilename(Fname))
+            {
+                retrieveERR();
+            }
+            printf("(%s - ", Fname);
+
+            // Read file size
+            for (j = 0; j < RRTFILESZ_SIZE; ++j)
+            {
+                if ((nTCP = readTCP(discard, DISCARDCHAR_SIZE - 1, 0)) == -1)
+                {
+                    exit(EXIT_FAILURE);
+                }
+                if (discard[0] != ' ')
+                { // anything other than the space we'll append
+                    strcat(FsizeBuf, &discard[0]);
+                }
+                else
+                { // space has bee read
+                    break;
+                }
+            }
+            FsizeBuf[j] = '\0';
+            printf("FsizeBuf: %s\n", FsizeBuf);
+            printf("%s bytes)\n", FsizeBuf);
+            if (discard[0] != ' ')
+            {
+                retrieveERR();
+            }
+            Fsize = atol(FsizeBuf);
+            printf("BANANA\n");
+            recvFile(Fname, Fsize);
+            printf("PERAS\n");
+            if ((nTCP = readTCP(discard, DISCARDCHAR_SIZE - 1, 0)) == -1)
+            {
                 exit(EXIT_FAILURE);
             }
-            backspace[nTCP] = '\0';
-            logTCPServer(backspace);
+            printf("I'm here\n");
+            discard[nTCP] = '\0';
+            printf("discard 732: %s\n", discard);
+            if (discard[0] != ' ' && discard[0] != '\n')
+            { // read extra space in file or last message \n
+                printf("Bumbum\n");
+                retrieveERR();
+            }
         }
         else
-        {
-            fprintf(stderr, "[-] Wrong protocol message received on retrieve. Program will now exit\n");
-            closeUDPSocket();
-            closeTCPSocket();
-            exit(EXIT_FAILURE);
+        { // wrong protocol message received
+            printf("Entered Here!\n");
+            retrieveERR();
         }
     }
+    printf("FUUUUUUUUUUUUUCK!!!!!!!!!!!!!!!!!!!!!!!!\n");
+    sendTCP("OK\n");
     closeTCPSocket();
 }
 

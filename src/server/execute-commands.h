@@ -29,6 +29,6 @@ int userSubscribe(char **tokenList, int numTokens, char **newGID);
 int userUnsubscribe(char **tokenList, int numTokens);
 char *createUsersInGroupMessage(int acceptfd, char *peekedMsg);
 char *userPost(int acceptfd, char *peekedMsg, int recvBytes);
-char *userRetrieve(int acceptfd, char *peekedMsg, int recvBytes);
+void createRetrieveMessage(int acceptfd, char* peekedMsg);
 
 #endif
