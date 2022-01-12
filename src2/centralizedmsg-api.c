@@ -6,6 +6,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#define MIN(x, y) (((x) < (y)) ? (x) : (y)) // Macro to determine min(x, y)
+
 int validRegex(char *buf, char *reg)
 {
     int reti;
@@ -148,4 +150,108 @@ int readTCP(int fd, char *message, int maxSize)
         bytesRead += n;
     }
     return bytesRead;
+}
+
+int validFName(char *FName)
+{
+    return validRegex(FName, "^[a-zA-Z0-9_-]{1,20}[.]{1}[a-zA-Z]{3}$");
+}
+
+int validMID(char *MID)
+{
+    if (!strcmp(MID, "0000"))
+        return 0;
+    return validRegex(MID, "^[0-9]{0,4}$");
+}
+
+/**
+ * @brief Auxiliary function of sendFile that sends an unsigned char buffer via TCP protocol.
+ *
+ * @param fd file descriptor to send the data to.
+ * @param buffer string that contains the buffer to be sent.
+ * @param num number of bytes to be sent.
+ * @return 1 if num bytes of buffer were sent, 0 otherwise.
+ */
+static int sendData(int fd, unsigned char *buffer, size_t num)
+{
+    unsigned char *tmpBuf = buffer;
+    ssize_t n;
+    while (num > 0)
+    {
+        n = write(fd, tmpBuf, num);
+        if (n == -1)
+        {
+            perror("[-] Failed to send file data via TCP");
+            return 0;
+        }
+        tmpBuf += n;
+        num -= n;
+    }
+    return 1;
+}
+
+int sendFile(int fd, FILE *post, long lenFile)
+{
+    unsigned char buffer[FILEBUFFER_SIZE];
+    do
+    {
+        size_t num = MIN(lenFile, FILEBUFFER_SIZE);
+        num = fread(buffer, sizeof(unsigned char), num, post);
+        if (num < 1)
+        {
+            fprintf(stderr, "[-] Failed on reading the given file. Please try again.\n");
+            fclose(post);
+            return 0;
+        }
+        if (!sendData(fd, buffer, num))
+        {
+            fclose(post);
+            return 0;
+        }
+        lenFile -= num;
+        memset(buffer, 0, sizeof(buffer));
+    } while (lenFile > 0);
+    return 1;
+}
+
+int recvFile(int fd, char *FName, long Fsize)
+{
+    long bytesRecv = 0;
+    int toRead;
+    unsigned char bufFile[FILEBUFFER_SIZE] = "";
+    ssize_t n;
+    FILE *file = fopen(FName, "wb");
+    if (!file)
+    {
+        perror("Failed to create file");
+        return 0;
+    }
+    do
+    {
+        toRead = MIN(sizeof(bufFile), Fsize - bytesRecv);
+        n = read(fd, bufFile, toRead);
+        if (n == -1)
+        {
+            perror("[-] Failed to read from TCP");
+            fclose(file);
+            return 0;
+        }
+        if (n > 0)
+        {
+            bytesRecv += n;
+            if (fwrite(bufFile, sizeof(unsigned char), n, file) != n)
+            {
+                fprintf(stderr, "[-] Failed to write on file.\n");
+                fclose(file);
+                return 0;
+            }
+        }
+        memset(bufFile, 0, n);
+    } while (bytesRecv < Fsize);
+    if (fclose(file) == -1)
+    {
+        fprintf(stderr, "[-] Failed to close file.\n");
+        return 0;
+    }
+    return 1;
 }

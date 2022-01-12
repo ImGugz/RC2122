@@ -13,11 +13,11 @@
 /* Ports range from 0 to 65535 */
 #define DS_PORT_SIZE 6
 
-/* The maximum buffer size to read from stdin from client side (POST command has the most characters) */
-#define CLIENT_COMMAND_SIZE 274
+/* The maximum buffer size to read from stdin from client side (it's actually around 273 but we'll give a seg fault margin for wrong input) */
+#define CLIENT_COMMAND_SIZE 512
 
-/* The maximum number of words written on command in stdin by the client (also from POST command) */
-#define CLIENT_NUMTOKENS 256
+/* The maximum number of words written on command in stdin by the client (it's actually around 256 but we'll give a seg fault margin too) */
+#define CLIENT_NUMTOKENS 512
 
 /* Macros used to parse client command and use switch cases instead of strcmp */
 #define INVALID_COMMAND -1
@@ -79,5 +79,45 @@
 
 /* The buffer size for a protocol message status via UDP protocol */
 #define PROTOCOL_STATUS_TCP_SIZE 5
+
+/* The maximum number of ASCII characters in a text message */
+#define PROTOCOL_TEXT_SIZE 241
+
+/* The maximum size of a buffer that contains the file name of the file being uploaded on post */
+#define PROTOCOL_FNAME_SIZE 25
+
+/* The size of a post command buffer with file excluding the file data that the client will send to the DS */
+#define CLIENTDS_POSTWFILE_SIZE 295
+
+/* The size of a post command buffer without a file included that will be sent to the DS */
+#define CLIENTDS_POSTWOFILE_SIZE 259
+
+/* The size of a post command reply buffer from the DS to the client */
+#define DS_POSTREPLY_SIZE 10
+
+/* The size of the unsigned char buffer that is read from the file and sent to a fd via TCP protocol */
+#define FILEBUFFER_SIZE 2048
+
+/* The size of a retrieve command buffer from the client to the DS */
+#define CLIENTDS_RTVBUF_SIZE 19
+
+/* The size of a retrieve status code from the DS to the client */
+#define DSCLIENT_RTVSTATUS_SIZE 3
+
+/* The size of a buffer that contains a single char from a DS reply */
+#define CHAR_SIZE 2
+
+/* The size of a buffer that contains the number of messages to retrieve */
+#define DSCLIENT_RTVNMSG_SIZE 2
+
+/* Macros used to keep retrieve function informed if first character of a MID has been read or not */
+#define MID_OK 0     // no need to concatenate
+#define MID_CONCAT 1 // need to concatenate -> first char of MID was previously read
+
+/* The size of a buffer that contains the number of bytes in a group message text */
+#define DS_MSGTEXTSZ_SIZE 4
+
+/* The size of a buffer that contains the number of bytes in a group message file */
+#define DS_MSGFILESZ_SIZE 11
 
 #endif

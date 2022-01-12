@@ -2,6 +2,7 @@
 #define API_H
 
 #include "centralizedmsg-api-constants.h"
+#include <stdio.h>
 
 /**
  * @brief Checks if a given buffer specifies a given pattern.
@@ -77,7 +78,7 @@ int validGID(char *GID);
 int validGName(char *GName);
 
 /**
- * @brief Checks if a given group message ID is valid according to the statement's rules.
+ * @brief Checks if a given group message ID is according to the statement's rules.
  *
  * @param MID string that contains the group message ID.
  * @return 1 if 0000 <= MID <= 9999, 0 otherwise.
@@ -101,5 +102,41 @@ int sendTCP(int fd, char *message);
  * @return -1 if read failed, otherwise the total number of bytes read.
  */
 int readTCP(int fd, char *message, int maxSize);
+
+/**
+ * @brief Checks if a given file name is valid according to the statement's rules.
+ *
+ * @param FName string that contains the file name.
+ * @return 1 if it's valid, 0 otherwise.
+ */
+int validFName(char *FName);
+
+/**
+ * @brief Checks if a given group message ID is valid according to the statement's rules.
+ *
+ * @param MID string that contains the message ID.
+ * @return 1 if 0001 <= MID <= 9999, 0 otherwise.
+ */
+int validMID(char *MID);
+
+/**
+ * @brief Sends a file via TCP.
+ *
+ * @param fd file descriptor to send the data to.
+ * @param post file stream of the file being sent-
+ * @param lenFile number of bytes in file being sent.
+ * @return 1 if file was sent, 0 otherwise.
+ */
+int sendFile(int fd, FILE *post, long lenFile);
+
+/**
+ * @brief Receives a file via TCP.
+ *
+ * @param fd file descriptor to read the data from.
+ * @param FName name of the file being received.
+ * @param Fsize number
+ * @return 1 if file was received, 0 otherwise.
+ */
+int recvFile(int fd, char *FName, long Fsize);
 
 #endif

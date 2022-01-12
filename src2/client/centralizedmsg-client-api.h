@@ -133,12 +133,27 @@ void closeDSUDPSocket();
 void connectDSTCPSocket();
 
 /**
- * @brief Shows all users that are subscribed to the current select DS group.
+ * @brief Shows all users that are subscribed to the current selected DS group.
  *
  * @param tokenList list that contains all the command's arguments (including the command itself).
  * @param numTokens number of command arguments.
  */
-void showUsersSubscribedToGroup(char **tokenList, int numTokens);
+void showClientsSubscribedToGroup(char **tokenList, int numTokens);
+
+/**
+ * @brief Posts a message on the current selected DS group.
+ *
+ * @param message string that contains the input command given to stdin.
+ */
+void clientPostInGroup(char *message);
+
+/**
+ * @brief Shows all messages from the current selected DS group starting from the given message ID.
+ *
+ * @param tokenList list that contains all the command's arguments (including the command itself).
+ * @param numTokens number of command arguments.
+ */
+void clientRetrieveFromGroup(char **tokenList, int numTokens);
 
 /**
  * @brief Closes the socket created to exchange messages between the client and the DS via UDP protocol.

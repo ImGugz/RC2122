@@ -1,3 +1,5 @@
+# Makefile RC 2021/2022 (Grupo 18) @ IST
+
 CC=gcc
 CFLAGS= -Wall -g
 
@@ -15,7 +17,6 @@ user: $(OBJ)
 	$(CC) $(CFLAGS) -o $@ $^ 
 
 $(ODIR)/%.o: %.c $(DEPS)
-	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c -o $@ $< 
 
 obj/centralizedmsg-client.o: client/centralizedmsg-client.c $(DEPS)

@@ -135,7 +135,13 @@ void processInput()
             showCurrentSelectedGID(numTokens);
             break;
         case ULIST:
-            showUsersSubscribedToGroup(tokenList, numTokens);
+            showClientsSubscribedToGroup(tokenList, numTokens);
+            break;
+        case POST:
+            clientPostInGroup(command);
+            break;
+        case RETRIEVE:
+            clientRetrieveFromGroup(tokenList, numTokens);
             break;
         }
     }
