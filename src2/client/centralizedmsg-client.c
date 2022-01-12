@@ -22,7 +22,7 @@ void processInput();
 int main(int argc, char *argv[])
 {
     parseArgs(argc, argv);
-    createDSUDPSocket(addrDS, portDS);
+    createDSUDPSocket();
     processInput();
     exit(EXIT_SUCCESS);
 }

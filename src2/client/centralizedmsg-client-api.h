@@ -10,8 +10,6 @@ extern char portDS[DS_PORT_SIZE];
 /**
  * @brief Creates socket that enables client-server communication via UDP protocol.
  *
- * @param addrDS string that contains the server's address.
- * @param portDS string that contains the server's port number.
  */
 void createDSUDPSocket();
 

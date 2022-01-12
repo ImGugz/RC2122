@@ -610,6 +610,11 @@ void showClientsSubscribedToGroup(char **tokenList, int numTokens)
                 closeDSTCPSocket();
                 return;
             }
+            // Set the new part to 0
+            size_t diffLens = 2 * lenMsg - lenMsg;
+            void *p_start = ((char *)new) + lenMsg;
+            memset(p_start, 0, diffLens);
+            // Update pointer and len of buffer
             p_message = new;
             lenMsg *= 2;
         }
@@ -622,9 +627,11 @@ void showClientsSubscribedToGroup(char **tokenList, int numTokens)
     }
     p_message[bytesRead - 1] = '\0';
 
+    // We'll use another pointer so we can iterate over it and free properly the allocated memory
+    char *p_aux = p_message;
     // Read status and code
     char codeDS[PROTOCOL_CODE_SIZE], statusDS[PROTOCOL_STATUS_TCP_SIZE];
-    sscanf(p_message, "%s %s", codeDS, statusDS);
+    sscanf(p_aux, "%s %s", codeDS, statusDS);
     if (strcmp(codeDS, "RUL"))
     {
         errDSTCP();
@@ -633,20 +640,25 @@ void showClientsSubscribedToGroup(char **tokenList, int numTokens)
     // Parse response from received status
     if (!strcmp(statusDS, "OK"))
     {
-        p_message += 7; // len (RUL OK ) = 7
+        p_aux += 7; // len (RUL OK ) = 7
         char GName[DS_GNAME_SIZE], UID[CLIENT_UID_SIZE];
-        sscanf(p_message, "%s", GName);
-        p_message += strlen(GName) + 1; // len(Gname) + len(' ')
+        sscanf(p_aux, "%s", GName);
+        if (!validGName(GName))
+        {
+            free(tmp);
+            errDSTCP();
+        }
+        p_aux += strlen(GName) + 1; // len(Gname) + len(' ')
         printf("[+] Users subscribed to %s: (UID)\n", GName);
-        while (sscanf(p_message, "%s ", UID) == 1)
+        while (sscanf(p_aux, "%s ", UID) == 1)
         {
             if (!validUID(UID))
             {
-                free(tmp);
+                free(p_message);
                 errDSTCP();
             }
             printf("-> %s\n", UID);
-            p_message += 6; // len (XXXXX ) = 6
+            p_aux += 6; // len (XXXXX ) = 6
         }
     }
     else if (!strcmp(statusDS, "NOK"))
@@ -655,10 +667,10 @@ void showClientsSubscribedToGroup(char **tokenList, int numTokens)
     }
     else
     { // Wrong protocol message received
-        free(tmp);
+        free(p_message);
         errDSTCP();
     }
-    free(tmp);
+    free(p_message);
     closeDSTCPSocket();
 }
 

@@ -120,4 +120,8 @@
 /* The size of a buffer that contains the number of bytes in a group message file */
 #define DS_MSGFILESZ_SIZE 11
 
+/* Macros for verbose on the DS */
+#define VERBOSE_OFF 0
+#define VERBOSE_ON 1
+
 #endif
