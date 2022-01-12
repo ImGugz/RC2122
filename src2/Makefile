@@ -1,34 +1,62 @@
-# Makefile RC 2021/2022 (Grupo 18) @ IST
+#CC = gcc
+#CFLAGS = -g -Wall
+#
+#ODIR = obj
+#
+#DEPS = centralizedmsg-api.h centralizedmsg-api-constants.h client/centralizedmsg-client-api.h
+#
+#_OBJ = centralizedmsg-api.o centralizedmsg-client.o centralizedmsg-client-api.o
+#OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
+#
+#.PHONY: all clean run
+#
+#
+#$(ODIR)/%.o: %.c $(DEPS)
+#	$(CC) $(CFLAGS) -c -o $@ $< 
+#
+#user: $(OBJ)
+#	$(CC) -o $@ $^ $(CFLAGS)
+#
+#
+#obj/centralizedmsg-api.o: centralizedmsg-api.c centralizedmsg-api.h centralizedmsg-api-constants.h
+#	$(CC) $(CFLAGS) -o centralizedmsg-api.o -c centralizedmsg-api.c
+#
+#obj/centralizedmsg-client.o: client/centralizedmsg-client.c
+#	$(CC) $(CFLAGS) -o centralizedmsg-client.o -c client/centralizedmsg-client.c
+#
+#obj/centralizedmsg-client-api.o: client/centralizedmsg-client-api.c client/centralizedmsg-client-api.h
+#	$(CC) $(CFLAGS) -o centralizedmsg-client-api.o -c client/centralizedmsg-client-api.c
+#
+#clean:
+#	@echo Cleaning...
+#	rm -f client/*.o *.o user
 
-CC = gcc
-CFLAGS = -g -o -Wall
+CC=gcc
+CFLAGS= -Wall -g
 
-SUBDIRS = . client server
-SUBDIRSCLEAN=$(addsuffix clean,$(SUBDIRS))
+ODIR=obj
 
-.PHONY = all clean run
+DEPS = centralizedmsg-api.h centralizedmsg-api-constants.h client/centralizedmsg-client-api.h 
+
+_OBJ = centralizedmsg-api.o centralizedmsg-client.o centralizedmsg-client-api.o 
+OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
+
 
 all: user
 
-user: udpandtcp.o auxfunctions.o execute-commands.o commands.o main.o
-	$(CC) $(CFLAGS) -o user udpandtcp.o auxfunctions.o execute-commands.o commands.o main.o
+user: $(OBJ)
+	$(CC) $(CFLAGS) -o $@ $^ 
 
-main.o: main.c execute-commands.h auxfunctions.h
-	$(CC) $(CFLAGS) -o main.o -c main.c
+$(ODIR)/%.o: %.c $(DEPS)
+	$(CC) $(CFLAGS) -c -o $@ $< 
 
-commands.o: commands.c commands.h execute-commands.h auxfunctions.h
-	$(CC) $(CFLAGS) -o commands.o -c commands.c
+obj/centralizedmsg-client.o: client/centralizedmsg-client.c $(DEPS)
+	$(CC) $(CFLAGS) -c -o $@ $< 
 
-execute-commands.o: execute-commands.c execute-commands.h udpandtcp.h auxfunctions.h
-	$(CC) $(CFLAGS) -o execute-commands.o -c execute-commands.c
+obj/centralizedmsg-client-api.o: client/centralizedmsg-client-api.c $(DEPS)
+	$(CC) $(CFLAGS) -c -o $@ $< 
 
-auxfunctions.o: auxfunctions.c auxfunctions.h udpandtcp.h
-	$(CC) $(CFLAGS) -o auxfunctions.o -c auxfunctions.c
+.PHONY: clean
 
-udpandtcp.o: udpandtcp.c udpandtcp.h execute-commands.h
-	$(CC) $(CFLAGS) -o udpandtcp.o -c udpandtcp.c
-
-clean: $(SUBDIRSCLEAN)
-
-	@echo Cleaning...
-	rm *.o $(objects)
+clean:
+	rm -f $(ODIR)/*.o *~ core $(INCDIR)/*~

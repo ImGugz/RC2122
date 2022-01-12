@@ -14,14 +14,19 @@ import os
 DSIP = "193.136.128.104"
 DSPORT = 58018
 
-test_group = 16
+#test_group = 27
 all_tests = [[1, 6, 8], [1, 2, 6, 7, 8], [6, 3, 5], [4], [6, 9, 10, 11, 12, 14, 15, 17], [6, 9, 11, 14, 16, 17], [6, 9, 14, 16, 17], [
-    6, 9, 12, 13, 14, 15, 17], [6, 9, 14, 20, 21, 22], [6, 9, 14, 23, 24, 25, 26, 30, 32, 34, 36, 38], [6, 9, 14, 27, 28, 29, 31, 33, 35, 37, 39]]
+    6, 9, 12, 13, 14, 15, 17], [6, 9, 14, 20, 21, 22], [6, 9, 14, 23, 24, 25, 26, 30, 32, 34, 36, 38], [27, 28, 29, 31, 33, 35, 37, 39]]
+
+# Test group 27 should have 6, 9, and 14 in the beggining
 
 if(os.path.exists("results")):
     os.system("rm -r -f results")
 os.mkdir("results")
-for tests in all_tests:
+for tests in all_tests[-2:]:
+    test_group = 16 + all_tests.index(tests)
+    if test_group >= 24:
+        test_group += 1
     print(f"[*] Starting tests for the item {test_group} [*]")
     if(not os.path.exists(f"results/{test_group}")):
         os.mkdir(f"results/{test_group}")
@@ -37,6 +42,6 @@ for tests in all_tests:
             except requests.exceptions.ConnectionError:
                 continue
 
-    test_group += 1
-    if(test_group == 24):
-        test_group += 1
+    #test_group += 1
+    # if(test_group == 24):
+     #   test_group += 1
