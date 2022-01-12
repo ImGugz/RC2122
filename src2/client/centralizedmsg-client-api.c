@@ -611,7 +611,7 @@ void showClientsSubscribedToGroup(char **tokenList, int numTokens)
                 return;
             }
             // Set the new part to 0
-            size_t diffLens = 2 * lenMsg - lenMsg;
+            size_t diffLens = lenMsg;
             void *p_start = ((char *)new) + lenMsg;
             memset(p_start, 0, diffLens);
             // Update pointer and len of buffer
