@@ -111,7 +111,7 @@ int validGName(char *gName)
  */
 int validFilename(char *fileName)
 {
-    return validRegex(fileName, "^[a-zA-Z0-9_-]{1,20}[.]{1}[a-z]{3}$");
+    return validRegex(fileName, "^[a-zA-Z0-9_-]{1,20}[.]{1}[a-zA-Z]{3}$");
 }
 
 /**
@@ -332,10 +332,6 @@ int sendData(unsigned char *buffer, size_t num)
             perror("[-] Failed to send file data via TCP");
             return 0;
         }
-        if (num - n == 0)
-        {
-            printf("Last sent was \\n: %d\n", (tmpBuf[n - 1] == '\n') ? 1 : 0);
-        }
         tmpBuf += n;
         num -= n;
     }
@@ -351,7 +347,7 @@ int sendData(unsigned char *buffer, size_t num)
  */
 int sendFile(FILE *post, long lenFile)
 {
-    unsigned char buffer[1024 + 1] = "";
+    unsigned char buffer[1024 + 2] = "";
     do
     {
         size_t num = MIN(lenFile, sizeof(buffer) - 1); // sizeof(buffer)-1 so it only reads 1024 worst case and buffer[num] = '\n' doesn't SIGSEGV
@@ -359,21 +355,16 @@ int sendFile(FILE *post, long lenFile)
         if (num < 1)
         {
             fprintf(stderr, "[-] Failed on reading the given file. Please try again.\n");
-            closeUDPSocket();
-            closeTCPSocket();
             fclose(post);
             return 0;
         }
         if (lenFile - num == 0)
         {
-            printf("Yo: %ld\n", num);
-            buffer[num++] = '\n';
-            printf("Ye: %ld and %d\n", num, (buffer[num - 1] == '\n') ? 1 : 0);
+            buffer[num] = ' ';      // extra space
+            buffer[num + 1] = '\n'; // newline
         }
         if (!sendData(buffer, num))
         {
-            closeUDPSocket();
-            closeTCPSocket();
             fclose(post);
             return 0;
         }

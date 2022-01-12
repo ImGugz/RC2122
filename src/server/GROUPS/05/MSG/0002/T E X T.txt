@@ -1,5 +1,1 @@
-<<<<<<< HEAD
 The Battle of Marathon took place in 490BC during the first Persion invasion of Greece. It was fought between the citizens of Athens, aided by Plataea, and a Persian force commanded by Datis and Artaphernes.
-=======
-The Battle of Marathon took place in 490BC during the first Persion invasion of Greece. It was fought between the citizens of Athens, aided by Plataea, and a Persian force commanded by Datis and Artaphernes.
->>>>>>> 3364039a8a2a6437719f3ad5d7a947f71dcc6fe6

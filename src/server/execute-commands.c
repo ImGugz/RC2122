@@ -42,7 +42,7 @@ int userRegister(char **tokenList, int numTokens)
         fprintf(stderr, "[-] Unable to create file.\n");
         return NOK;
     }
-    if (fwrite(tokenList[2], sizeof(char), USERPW_SIZE, fPtr) != USERPW_SIZE)
+    if (fwrite(tokenList[2], sizeof(char), USERPWD_SIZE - 1, fPtr) != USERPWD_SIZE - 1)
     {
         fprintf(stderr, "[-] Writing password to file failed.\n");
         return NOK;
@@ -530,7 +530,7 @@ char *createUsersInGroupMessage(int acceptfd, char *peekedMsg)
     if (d)
     {
         struct dirent *dir;
-        char UIDtxt[MAX_UID_SIZE];
+        char UIDtxt[USERID_SIZE];
         tmp = (char *)calloc(sizeof(char), INITIAL_ULBUF_SIZE + 1); // 10 users
         if (!tmp)
         {
@@ -550,11 +550,11 @@ char *createUsersInGroupMessage(int acceptfd, char *peekedMsg)
             {
                 continue;
             }
-            strncpy(UIDtxt, dir->d_name, MAX_UID_SIZE - 1);
-            UIDtxt[MAX_UID_SIZE - 1] = '\0';
+            strncpy(UIDtxt, dir->d_name, USERID_SIZE - 1);
+            UIDtxt[USERID_SIZE - 1] = '\0';
             if (validUID(UIDtxt))
             {
-                if (curr + MAX_UID_SIZE >= len)
+                if (curr + USERID_SIZE >= len)
                 {
                     char *newPtr = (char *)realloc(users, len + 6 * 10); // 10 more users
                     if (newPtr == NULL)
@@ -564,7 +564,7 @@ char *createUsersInGroupMessage(int acceptfd, char *peekedMsg)
                         return strdup("RUL NOK\n");
                     }
                     users = newPtr;
-                    len += MAX_UID_SIZE * 10;
+                    len += USERID_SIZE * 10;
                 }
                 curr += sprintf(users + curr, "%s ", UIDtxt);
             }
@@ -577,7 +577,7 @@ char *createUsersInGroupMessage(int acceptfd, char *peekedMsg)
 char *userPost(int acceptfd, char *peekedMsg, int recvBytes)
 {
     char clientBuf[MAX_RECVTCP_SIZE];
-    char givenUID[MAX_UID_SIZE], givenGID[MAX_GID_SIZE], givenTextSize[MAX_TEXTSZ_SIZE], givenText[MAX_PSTTEXT_SIZE];
+    char givenUID[USERID_SIZE], givenGID[MAX_GID_SIZE], givenTextSize[MAX_TEXTSZ_SIZE], givenText[MAX_PSTTEXT_SIZE];
     int textSize;
     sscanf(peekedMsg, "PST %s %s %s ", givenUID, givenGID, givenTextSize); // assumes at least offset bytes will come
     textSize = atoi(givenTextSize);
@@ -646,4 +646,229 @@ char *userPost(int acceptfd, char *peekedMsg, int recvBytes)
         }
     }
     return newMID;
+}
+
+void createRetrieveMessage(int acceptfd, char *peekedMsg)
+{
+    char UID[USERID_SIZE], GID[MAX_GID_SIZE], MID[MAX_MID_SIZE];
+    char temp[300];
+    sscanf(peekedMsg, "RTV %s %s %s", UID, GID, MID);
+    int nTEMP;
+    if ((nTEMP = readTCP(acceptfd, temp, strlen(peekedMsg) + 1, 0)) == -1)
+    {
+        fprintf(stderr, "[-] Failed to read dumbfuck.\n");
+        exit(EXIT_FAILURE);
+    }
+    temp[nTEMP] = '\0';
+    if (peekedMsg[strlen(peekedMsg) - 1] != '\n')
+    { // every reply/request must end with \n
+        fprintf(stderr, "[-] Wrong retrieve command received according to protocol.\n");
+        failRetrieve(acceptfd, "ERR");
+    }
+    if (!(validUID(UID) && validGID(GID) && validMID(MID)))
+    { // check if given arguments are protocol valid
+        fprintf(stderr, "[-] Invalid retrieve command arguments were given.\n");
+        failRetrieve(acceptfd, "NOK");
+    }
+    if (!userSubscribedToGroup(UID, GID))
+    { // check if user is subscribed to group
+        fprintf(stderr, "[-] User isn't subscribed to group.\n");
+        failRetrieve(acceptfd, "NOK");
+    }
+    struct dirent **d;
+    char groupPath[GROUPMSGDIR_SIZE];
+    sprintf(groupPath, "GROUPS/%s/MSG", GID);
+    int n = scandir(groupPath, &d, 0, invsort);
+    if (n < 0)
+    { // scandir failed
+        perror("[-] scandir on retrieve groupPath failed");
+        failRetrieve(acceptfd, "NOK");
+    }
+    int numMsgsRetrieve = numMessagesToRetrieve(d, n, MID);
+    if (numMsgsRetrieve == 0)
+    { // no messages to retrieve
+        failRetrieve(acceptfd, "EOF");
+    }
+    else if (numMsgsRetrieve > 20)
+    {
+        numMsgsRetrieve = 20;
+    }
+    char buffer[100];
+    sprintf(buffer, "RRT OK %d", numMsgsRetrieve);
+    sendTCP(acceptfd, buffer, strlen(buffer));
+    int count = 0;
+    while (n--)
+    {
+        if (d[n]->d_type == DT_DIR && validMID(d[n]->d_name) && atoi(d[n]->d_name) >= atoi(MID) && count < numMsgsRetrieve)
+        { // this is a message to retrieve
+            char textMessage[270];
+            char fileMessage[50];
+            char readDName[DIRENTDIR_SIZE + 1];
+            char dirMID[MAX_MID_SIZE] = "";
+            char groupMsgPath[GROUPNEWMSGDIR_SIZE];
+            DIR *msgsDir;
+            struct dirent *msgEntry;
+            int msgFileFlag = 0;
+            char msgFileName[MAX_FILENAME_SIZE] = "";
+            char msgFilePath[GROUPNEWMSGDIR_SIZE + MAX_FILENAME_SIZE] = "";
+            long fileLength = 0;
+            FILE *fileStream;
+            strcpy(readDName, d[n]->d_name);
+            strncpy(dirMID, readDName, 4);
+            dirMID[MAX_MID_SIZE - 1] = '\0';
+            if (!validMID(dirMID))
+            { // for some reason it doesn't store a valid MID
+                fprintf(stderr, "[-] Invalid MID was found: %s\n", dirMID);
+                failRetrieve(acceptfd, "NOK");
+            }
+            sprintf(groupMsgPath, "GROUPS/%s/MSG/%s", GID, dirMID);
+            // For each valid MID we're opening its directory and analysing its content
+            msgsDir = opendir(groupMsgPath);
+            if (msgsDir == NULL)
+            {
+                perror("[-] Failed to open msg dir");
+                failRetrieve(acceptfd, "NOK");
+            }
+            while ((msgEntry = readdir(msgsDir)) != NULL)
+            {
+                if (!strcmp(".", msgEntry->d_name) || !strcmp("..", msgEntry->d_name) || !strcmp(msgEntry->d_name, "A U T H O R.txt") || !strcmp(msgEntry->d_name, "T E X T.txt"))
+                {
+                    continue;
+                }
+                // Check if message to retrieve has a file to send
+                if (msgEntry->d_type == DT_REG)
+                { // if it gets here it means this message contains a file to be sent to the client
+                    msgFileFlag = 1;
+                    // Now let's copy its name and determine its length in bytes
+                    memset(readDName, 0, sizeof(readDName));
+                    memset(msgFileName, 0, sizeof(msgFileName));
+                    memset(msgFilePath, 0, sizeof(msgFilePath));
+                    strcpy(readDName, msgEntry->d_name);
+                    strncpy(msgFileName, readDName, strlen(readDName));
+                    sprintf(msgFilePath, "%s/%s", groupMsgPath, msgFileName);
+                    fileStream = fopen(msgFilePath, "rb");
+                    if (fileStream == NULL)
+                    {
+                        perror("[-] Failed to open msg file");
+                        failRetrieve(acceptfd, "NOK");
+                    }
+                    if (fseek(fileStream, 0, SEEK_END) == -1)
+                    {
+                        perror("[-] Failed to seek on msg file");
+                        failRetrieve(acceptfd, "NOK");
+                    }
+                    fileLength = ftell(fileStream);
+                    rewind(fileStream);
+                    fclose(fileStream);
+                }
+            }
+            free(msgsDir);
+            // Open author and text files and read them
+            FILE *autStream, *txtStream;
+            char msgAuthorPath[GROUPNEWMSGAUT_SIZE], msgTextPath[GROUPNEWMSGTXT_SIZE];
+            sprintf(msgAuthorPath, "%s/A U T H O R.txt", groupMsgPath);
+            sprintf(msgTextPath, "%s/T E X T.txt", groupMsgPath);
+            long lenAuthor, lenText;
+            autStream = fopen(msgAuthorPath, "r");
+            if (autStream == NULL)
+            {
+                perror("[-] Failed to open msg author file");
+                failRetrieve(acceptfd, "NOK");
+            }
+            if (fseek(autStream, 0, SEEK_END) == -1)
+            {
+                perror("[-] Failed to seek msg author file");
+                failRetrieve(acceptfd, "NOK");
+            }
+            lenAuthor = ftell(autStream) - 1; // author has \n so we avoid this extra byte
+            rewind(autStream);
+            txtStream = fopen(msgTextPath, "r");
+            if (txtStream == NULL)
+            {
+                perror("[-] Failed to open msg text file");
+                failRetrieve(acceptfd, "NOK");
+            }
+            if (fseek(txtStream, 0, SEEK_END) == -1)
+            {
+                perror("[-] Failed to seek msg author file");
+                failRetrieve(acceptfd, "NOK");
+            }
+            lenText = ftell(txtStream);
+            rewind(txtStream);
+            // allocate needed memory for both buffers
+            char *msgAuthor = (char *)calloc(sizeof(char), lenAuthor + 1);
+            if (!msgAuthor)
+            {
+                fprintf(stderr, "[-] Failed to calloc on author\n");
+                failRetrieve(acceptfd, "NOK");
+            }
+            char *msgText = (char *)calloc(sizeof(char), lenText + 1);
+            if (!msgText)
+            {
+                fprintf(stderr, "[-] Failed to calloc on text\n");
+                free(msgAuthor);
+                failRetrieve(acceptfd, "NOK");
+            }
+            // fill both buffers
+            if (fread(msgAuthor, sizeof(char), lenAuthor, autStream) == -1)
+            {
+                perror("[-] Failed to read from author file");
+                failRetrieve(acceptfd, "NOK");
+            }
+            if (fread(msgText, sizeof(char), lenText, txtStream) == -1)
+            {
+                perror("[-] Failed to read from text file");
+                failRetrieve(acceptfd, "NOK");
+            }
+            if (fclose(autStream) == -1)
+            {
+                perror("[-] Failed to close author file");
+                failRetrieve(acceptfd, "NOK");
+            }
+            if (fclose(txtStream) == -1)
+            {
+                perror("[-] Failed to close text file");
+                failRetrieve(acceptfd, "NOK");
+            }
+            msgAuthor[lenAuthor] = '\0';
+            msgText[lenText] = '\0';
+            if (count == numMsgsRetrieve - 1 && !msgFileFlag)
+            {
+                sprintf(textMessage, " %s %s %ld %s\n", dirMID, msgAuthor, lenText, msgText);
+            }
+            else
+            {
+                sprintf(textMessage, " %s %s %ld %s", dirMID, msgAuthor, lenText, msgText);
+            }
+            sendTCP(acceptfd, textMessage, strlen(textMessage));
+            if (msgFileFlag)
+            { // there's a file to send
+                char fileInfo[41];
+                fileStream = fopen(msgFilePath, "rb");
+                sprintf(fileInfo, " / %s %ld ", msgFileName, fileLength);
+                sendTCP(acceptfd, fileInfo, strlen(fileInfo));
+                if (!sendFile(acceptfd, fileStream, fileLength))
+                {
+                    failRetrieve(acceptfd, "NOK");
+                }
+                if (count == numMsgsRetrieve - 1)
+                {
+                    sendTCP(acceptfd, "\n", 1);
+                }
+            }
+            free(msgAuthor);
+            free(msgText);
+            count++;
+        }
+        free(d[n]);
+    }
+    free(d);
+    char userConfirmation[4];
+    size_t n_bytes;
+
+    if ((n_bytes = readTCP(acceptfd, userConfirmation, 3, 0)) == -1)
+    {
+        failRetrieve(acceptfd, "NOK");
+    }
+    userConfirmation[3] = '\0';
 }
