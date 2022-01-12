@@ -49,4 +49,26 @@
 /* The buffer size for a protocol message status via UDP protocol */
 #define PROTOCOL_STATUS_UDP_SIZE 8
 
+/* Macros used to keep current client session state */
+#define LOGGED_OUT 0
+#define LOGGED_IN 1
+
+/* The size of a client's UID according to the statement's rules */
+#define CLIENT_UID_SIZE 6
+
+/* The size of a client's password according to the statement's rules */
+#define CLIENT_PWD_SIZE 9
+
+/* The size of a buffer containing all relevant information about a DS group */
+#define DS_GROUPINFO_SIZE 34
+
+/* The size of a DS's group ID according to the statement's rules */
+#define DS_GID_SIZE 3
+
+/* The maximum size of DS group name */
+#define DS_GNAME_SIZE 25
+
+/* The size of a DS group message ID according to the statement's rules */
+#define DS_MID_SIZE 5
+
 #endif

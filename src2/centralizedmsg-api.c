@@ -35,16 +35,6 @@ int validPort(char *port)
     return validRegex(port, "^([0-9]{1,4}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$");
 }
 
-int validUID(char *UID)
-{
-    return validRegex(UID, "^[0-9]{5}$");
-}
-
-int validPW(char *PW)
-{
-    return validRegex(PW, "^[a-zA-Z0-9]{8}$");
-}
-
 int parseClientCommand(char *command)
 {
     if (!strcmp(command, "reg"))
@@ -82,4 +72,40 @@ int parseClientCommand(char *command)
         fprintf(stderr, "[-] Invalid user command code. Please try again.\n");
         return INVALID_COMMAND;
     }
+}
+
+int validUID(char *UID)
+{
+    return validRegex(UID, "^[0-9]{5}$");
+}
+
+int validPW(char *PW)
+{
+    return validRegex(PW, "^[a-zA-Z0-9]{8}$");
+}
+
+int isNumber(char *num)
+{
+    size_t len = strlen(num);
+    for (int i = 0; i < len; ++i)
+    {
+        if (num[i] < '0' || num[i] > '9')
+            return 0;
+    }
+    return 1;
+}
+
+int validGID(char *GID)
+{
+    return validRegex(GID, "^([0][1-9]|[1-9][0-9])$");
+}
+
+int validGName(char *GName)
+{
+    return validRegex(GName, "^[a-zA-Z0-9_-]{1,24}$");
+}
+
+int isMID(char *MID)
+{
+    return validRegex(MID, "^[0-9]{4}$");
 }

@@ -105,6 +105,30 @@ void processInput()
         case REGISTER:
             clientRegister(tokenList, numTokens);
             break;
+        case UNREGISTER:
+            clientUnregister(tokenList, numTokens);
+            break;
+        case LOGIN:
+            clientLogin(tokenList, numTokens);
+            break;
+        case LOGOUT:
+            clientLogout(tokenList, numTokens);
+            break;
+        case SHOWUID:
+            showCurrentClient(numTokens);
+            break;
+        case EXIT:
+            clientExit(numTokens);
+            break;
+        case GROUPS:
+            showDSGroups(numTokens);
+            break;
+        case SUBSCRIBE:
+            clientSubscribeGroup(tokenList, numTokens);
+            break;
+        case UNSUBSCRIBE:
+            clientUnsubscribeGroup(tokenList, numTokens);
+            break;
         }
     }
 }

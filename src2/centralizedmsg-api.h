@@ -29,6 +29,14 @@ int validAddress(char *address);
 int validPort(char *port);
 
 /**
+ * @brief "Translates" a given command into a pre-defined macro.
+ *
+ * @param command string containing the command.
+ * @return respective MACRO assigned to given command.
+ */
+int parseClientCommand(char *command);
+
+/**
  * @brief Checks if a given user ID is valid according to the statement's rules.
  *
  * @param UID string that contains the used ID.
@@ -45,11 +53,35 @@ int validUID(char *UID);
 int validPW(char *PW);
 
 /**
- * @brief "Translates" a given command into a pre-defined macro.
+ * @brief Checks if a given string is a decimal positive number.
  *
- * @param command string containing the command.
- * @return respective MACRO assigned to given command.
+ * @param num string that contains the number (or not).
+ * @return 1 if it's a decimal positive number, 0 otherwise.
  */
-int parseClientCommand(char *command);
+int isNumber(char *number);
+
+/**
+ * @brief Checks if a given group ID is valid according to the statement's rules.
+ *
+ * @param GID string that contains the group ID.
+ * @return 1 if it's valid, 0 otherwise.
+ */
+int validGID(char *GID);
+
+/**
+ * @brief Checks if a given group name is valid according to the statement's rules.
+ *
+ * @param gName string that contains the group name.
+ * @return 1 if it's valid, 0 otherwise.
+ */
+int validGName(char *GName);
+
+/**
+ * @brief Checks if a given group message ID is valid according to the statement's rules.
+ *
+ * @param MID string that contains the group message ID.
+ * @return 1 if 0000 <= MID <= 9999, 0 otherwise.
+ */
+int isMID(char *MID);
 
 #endif
