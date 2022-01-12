@@ -5,10 +5,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* DS address and port number */
-char addrDS[DS_ADDR_SIZE] = DS_DEFAULT_ADDR;
-char portDS[DS_PORT_SIZE] = DS_DEFAULT_PORT;
-
 /**
  * @brief Parses the program's arguments for the DS address and port.
  *
@@ -128,6 +124,18 @@ void processInput()
             break;
         case UNSUBSCRIBE:
             clientUnsubscribeGroup(tokenList, numTokens);
+            break;
+        case MY_GROUPS:
+            clientShowSubscribedGroups(numTokens);
+            break;
+        case SELECT:
+            clientSelectGroup(tokenList, numTokens);
+            break;
+        case SHOWGID:
+            showCurrentSelectedGID(numTokens);
+            break;
+        case ULIST:
+            showUsersSubscribedToGroup(tokenList, numTokens);
             break;
         }
     }

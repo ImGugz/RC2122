@@ -84,4 +84,22 @@ int validGName(char *GName);
  */
 int isMID(char *MID);
 
+/**
+ * @brief Sends a message to a specified file descriptor via TCP protocol.
+ *
+ * @param message string that contains the message to be sent.
+ * @return number of bytes sent if successful, -1 otherwise.
+ */
+int sendTCP(int fd, char *message);
+
+/**
+ * @brief Reads from a file descriptor on to a buffer via TCP protocol.
+ *
+ * @param fd file descriptor to read via TCP protocol.
+ * @param message buffer to store what is read.
+ * @param maxSize maximum number of bytes to read at a time.
+ * @return -1 if read failed, otherwise the total number of bytes read.
+ */
+int readTCP(int fd, char *message, int maxSize);
+
 #endif

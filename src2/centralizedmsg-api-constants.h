@@ -71,4 +71,13 @@
 /* The size of a DS group message ID according to the statement's rules */
 #define DS_MID_SIZE 5
 
+/* The size of a ulist command buffer from the client to the server */
+#define CLIENTDS_ULISTBUF_SIZE 8
+
+/* Arbitrary size to read from TCP in ULIST each time readTCP is called */
+#define DSCLIENT_ULISTREAD_SIZE 512
+
+/* The buffer size for a protocol message status via UDP protocol */
+#define PROTOCOL_STATUS_TCP_SIZE 5
+
 #endif

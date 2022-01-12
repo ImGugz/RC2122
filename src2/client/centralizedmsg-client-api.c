@@ -8,15 +8,26 @@
 #include <stdio.h>
 #include <errno.h>
 
+/* DS Server information variables */
+char addrDS[DS_ADDR_SIZE] = DS_DEFAULT_ADDR;
+char portDS[DS_PORT_SIZE] = DS_DEFAULT_PORT;
+
 /* UDP Socket related variables */
 int fdDSUDP;
 struct addrinfo hintsUDP, *resUDP;
 struct sockaddr_in addrUDP;
 socklen_t addrlenUDP;
 
+/* TCP Socket related variables */
+int fdDSTCP;
+struct addrinfo hintsTCP, *resTCP;
+
 /* Client current session variables */
 int clientSession; // LOGGED_IN or LOGGED_OUT
 char activeClientUID[CLIENT_UID_SIZE], activeClientPWD[CLIENT_PWD_SIZE];
+
+/* Client DS group selected variable */
+char activeDSGID[DS_GID_SIZE];
 
 /* Message to DS via UDP protocol variable */
 char messageToDSUDP[CLIENT_TO_DS_UDP_SIZE];
@@ -33,29 +44,30 @@ static void displayGroups(char *message, int numGroups)
         printf("[+] %d group: (GID | GName | Last MID)\n", numGroups);
     }
     else
-    { // Safe to assume this else since numGroups is a positive number
-        // len(GLS 10) = 7; len(GLS 9) = 5
+    {
         printf("[+] %d groups: (GID | GName | Last MID)\n", numGroups);
-        char *p_message = (numGroups >= 10) ? message + 6 : message + 5;
-        char groupInfo[DS_GROUPINFO_SIZE];
-        char GID[DS_GID_SIZE], GName[DS_GNAME_SIZE], MID[DS_MID_SIZE];
-        int offsetPtr;
-        while (numGroups--)
+    }
+    // Safe to assume if it gets here since numGroups is a positive number
+    // len(GLS 10) = 6; len(GLS 9) = 5
+    char *p_message = (numGroups >= 10) ? message + 6 : message + 5;
+    char groupInfo[DS_GROUPINFO_SIZE];
+    char GID[DS_GID_SIZE], GName[DS_GNAME_SIZE], MID[DS_MID_SIZE];
+    int offsetPtr;
+    while (numGroups--)
+    {
+        sscanf(p_message, " %s %s %s%n", GID, GName, MID, &offsetPtr);
+        if (!(validGID(GID) && validGName(GName) && isMID(MID)))
         {
-            sscanf(p_message, " %s %s %s%n", GID, GName, MID, &offsetPtr);
-            if (!(validGID(GID) && validGName(GName) && isMID(MID)))
-            {
-                fprintf(stderr, "[-] Wrong protocol message received from server via UDP. Program will now exit.\n");
-                closeDSUDPSocket();
-                exit(EXIT_FAILURE);
-            }
-            printf("-> %2s | %24s | %4s\n", GID, GName, MID);
-            p_message += offsetPtr;
+            fprintf(stderr, "[-] Wrong protocol message received from server via UDP. Program will now exit.\n");
+            closeDSUDPSocket();
+            exit(EXIT_FAILURE);
         }
+        printf("-> %2s | %24s | %4s\n", GID, GName, MID);
+        p_message += offsetPtr;
     }
 }
 
-void createDSUDPSocket(char *addrDS, char *portDS)
+void createDSUDPSocket()
 {
     fdDSUDP = socket(AF_INET, SOCK_DGRAM, 0);
     if (fdDSUDP == -1)
@@ -202,6 +214,40 @@ void processDSUDPReply(char *message)
         else
         {
             fprintf(stderr, "[-] Unexpected subscribe protocol message was received. Program will now exit.\n");
+            closeDSUDPSocket();
+            exit(EXIT_FAILURE);
+        }
+    }
+    else if (!strcmp(codeDS, "RGU"))
+    { // UNSUBSCRIBE command
+        if (!strcmp(statusDS, "OK"))
+        {
+            printf("[+] You have successfully unsubscribed to this group.\n");
+        }
+        else if (!strcmp(statusDS, "E_USR"))
+        {
+            fprintf(stderr, "[-] UID submitted to server is incorrect. Please try again and/or contact the developers.\n");
+        }
+        else if (!strcmp(statusDS, "E_GRP"))
+        {
+            fprintf(stderr, "[-] Invalid given group ID. Please check available groups using 'gl' command and try again.\n");
+        }
+        else
+        {
+            fprintf(stderr, "[-] Unexpected unsubscribe protocol message was received. Program will now exit.\n");
+            closeDSUDPSocket();
+            exit(EXIT_FAILURE);
+        }
+    }
+    else if (!strcmp(codeDS, "RGM"))
+    { // MY_GROUPS command
+        if (isNumber(statusDS))
+        {
+            displayGroups(message, atoi(statusDS));
+        }
+        else
+        {
+            fprintf(stderr, "[-] Unexpected my groups list protocol message was received. Program will now exit.\n");
             closeDSUDPSocket();
             exit(EXIT_FAILURE);
         }
@@ -395,14 +441,14 @@ void clientSubscribeGroup(char **tokenList, int numTokens)
 
 void clientUnsubscribeGroup(char **tokenList, int numTokens)
 {
-    if (clientSession == LOGGED_OUT)
-    {
-        fprintf(stderr, "[-] Please login before you unsubscribe to a group.\n");
+    if (numTokens != 2)
+    { // UNSUBSCRIBE GID
+        fprintf(stderr, "[-] Incorrect unsubscribe command usage. Please try again.\n");
         return;
     }
-    if (numTokens != 2)
-    {
-        fprintf(stderr, "[-] Incorrect unsubscribe command usage. Please try again.\n");
+    if (clientSession == LOGGED_OUT)
+    { // User must be logged in order to unsubscribe to a group
+        fprintf(stderr, "[-] Please login before you unsubscribe to a group.\n");
         return;
     }
     if (!validGID(tokenList[1]))
@@ -414,8 +460,217 @@ void clientUnsubscribeGroup(char **tokenList, int numTokens)
     exchangeDSUDPMsg(messageToDSUDP);
 }
 
+void clientShowSubscribedGroups(int numTokens)
+{
+    if (numTokens != 1)
+    { // MY_GROUPS / MGL
+        fprintf(stderr, "[-] Incorrect user groups' list command usage. Please try again.\n");
+        return;
+    }
+    if (clientSession == LOGGED_OUT)
+    {
+        fprintf(stderr, "[-] Please login before you request for your subscribed groups list.\n");
+        return;
+    }
+    sprintf(messageToDSUDP, "GLM %s\n", activeClientUID);
+    exchangeDSUDPMsg(messageToDSUDP);
+}
+
+void clientSelectGroup(char **tokenList, int numTokens)
+{
+    if (numTokens != 2)
+    { // SELECT GID
+        fprintf(stderr, "[-] Incorrect select command usage. Please try again.\n");
+        return;
+    }
+    if (clientSession == LOGGED_OUT)
+    {
+        fprintf(stderr, "[-] Please login before you select a group.\n");
+        return;
+    }
+    if (!validGID(tokenList[1]))
+    {
+        fprintf(stderr, "[-] Invalid given group ID to select. Please try again.\n");
+        return;
+    }
+    strcpy(activeDSGID, tokenList[1]);
+    printf("[+] You have successfully selected group %s.\n[!] Make sure you've chosen a GID that actually exists in the DS's database. For further details use command 'gl'.\n", activeDSGID);
+}
+
+void showCurrentSelectedGID(int numTokens)
+{
+    if (numTokens != 1)
+    { // SHOWGID / SG
+        fprintf(stderr, "[-] Incorrect show select group command usage. Please try again.\n");
+        return;
+    }
+    if (strlen(activeDSGID) > 0)
+    {
+        printf("[+] Group %s is selected.\n", activeDSGID);
+    }
+    else
+    {
+        printf("[-] You haven't selected any group yet.\n");
+    }
+}
+
 void closeDSUDPSocket()
 {
     freeaddrinfo(resUDP);
     close(fdDSUDP);
+}
+
+void connectDSTCPSocket()
+{
+    fdDSTCP = socket(AF_INET, SOCK_STREAM, 0);
+    if (fdDSTCP == -1)
+    {
+        perror("[-] Client TCP socket failed to create");
+        closeDSUDPSocket();
+        exit(EXIT_FAILURE);
+    }
+    memset(&hintsTCP, 0, sizeof(hintsTCP));
+    hintsTCP.ai_family = AF_INET;
+    hintsTCP.ai_socktype = SOCK_STREAM;
+    int errcode = getaddrinfo(addrDS, portDS, &hintsTCP, &resTCP);
+    if (errcode != 0)
+    {
+        perror("[-] Failed on TCP address translation");
+        close(fdDSTCP);
+        closeDSUDPSocket();
+        exit(EXIT_FAILURE);
+    }
+    int n = connect(fdDSTCP, resTCP->ai_addr, resTCP->ai_addrlen);
+    if (n == -1)
+    {
+        perror("[-] Failed to connect to TCP socket");
+        closeDSUDPSocket();
+        closeDSTCPSocket();
+        exit(EXIT_FAILURE);
+    }
+}
+
+void showUsersSubscribedToGroup(char **tokenList, int numTokens)
+{
+    if (numTokens != 1)
+    {
+        fprintf(stderr, "[-] Incorrect list group's users command usage. Please try again.\n");
+        return;
+    }
+    if (clientSession == LOGGED_OUT)
+    {
+        fprintf(stderr, "[-] Please login before you request the list of users that are subscribed to your selected group.\n");
+        return;
+    }
+    if (strlen(activeDSGID) == 0)
+    {
+        fprintf(stderr, "[-] Please select a group before you request the list of users that are subscribed to it.\n");
+        return;
+    }
+
+    // Connect to DS TCP socket
+    connectDSTCPSocket();
+
+    // Send protocol message to DS
+    char ulistClientMessage[CLIENTDS_ULISTBUF_SIZE];
+    sprintf(ulistClientMessage, "ULS %s\n", activeDSGID);
+    if (sendTCP(fdDSTCP, ulistClientMessage) == -1)
+    {
+        closeDSUDPSocket();
+        closeDSTCPSocket();
+        exit(EXIT_FAILURE);
+    }
+
+    // Read message from DS -> indefinitely read until nl has been read
+    int lenMsg = DSCLIENT_ULISTREAD_SIZE; // arbitrary initial size to read
+    char *tmp = (char *)calloc(sizeof(char), lenMsg + 1);
+    if (tmp == NULL)
+    {
+        fprintf(stderr, "[-] Failed to allocate memory in calloc.\n");
+        closeDSTCPSocket();
+        return;
+    }
+    char *p_message = tmp;
+    char readBuffer[DSCLIENT_ULISTREAD_SIZE];
+    int n, bytesRead = 0;
+    while ((n = readTCP(fdDSTCP, readBuffer, DSCLIENT_ULISTREAD_SIZE)) > 0)
+    { // Read all the data that the DS sends
+        if (bytesRead + n >= lenMsg)
+        {
+            char *new = (char *)realloc(p_message, 2 * lenMsg);
+            if (new == NULL)
+            {
+                free(p_message);
+                fprintf(stderr, "[-] Failed to allocate memory in calloc.\n");
+                closeDSTCPSocket();
+                return;
+            }
+            p_message = new;
+            lenMsg *= 2;
+        }
+        memcpy(p_message + bytesRead, readBuffer, n);
+        bytesRead += n;
+    }
+    if (p_message[bytesRead - 1] != '\n')
+    { // Each request/reply ends with newline according to DS-Client communication protocol
+        fprintf(stderr, "[-] Wrong protocol message received from server via TCP. Program will now exit.\n");
+        closeDSUDPSocket();
+        closeDSTCPSocket();
+        exit(EXIT_FAILURE);
+    }
+    p_message[bytesRead - 1] = '\0';
+
+    // Read status and code
+    char codeDS[PROTOCOL_CODE_SIZE], statusDS[PROTOCOL_STATUS_TCP_SIZE];
+    sscanf(p_message, "%s %s", codeDS, statusDS);
+    if (strcmp(codeDS, "RUL"))
+    {
+        fprintf(stderr, "[-] Wrong protocol message received from server via TCP. Program will now exit.\n");
+        closeDSUDPSocket();
+        closeDSTCPSocket();
+        exit(EXIT_FAILURE);
+    }
+
+    // Parse response from received status
+    if (!strcmp(statusDS, "OK"))
+    {
+        p_message += 7; // len (RUL OK ) = 7
+        char GName[DS_GNAME_SIZE], UID[CLIENT_UID_SIZE];
+        sscanf(p_message, "%s", GName);
+        p_message += strlen(GName) + 1; // len(Gname) + len(' ')
+        printf("[+] Users subscribed to %s: (UID)\n", GName);
+        while (sscanf(p_message, "%s ", UID) == 1)
+        {
+            if (!validUID(UID))
+            {
+                fprintf(stderr, "[-] Wrong protocol message received from server via TCP. Program will now exit.\n");
+                free(p_message);
+                closeDSUDPSocket();
+                closeDSTCPSocket();
+                exit(EXIT_FAILURE);
+            }
+            printf("-> %s\n", UID);
+            p_message += 6; // len (XXXXX ) = 6
+        }
+    }
+    else if (!strcmp(statusDS, "NOK"))
+    {
+        fprintf(stderr, "[-] The group you've selected doesn't exist. Please try again.\n");
+    }
+    else
+    {
+        fprintf(stderr, "[-] Wrong protocol message received from server via TCP. Program will now exit.\n");
+        free(tmp);
+        closeDSUDPSocket();
+        closeDSTCPSocket();
+        exit(EXIT_FAILURE);
+    }
+    free(tmp);
+    closeDSTCPSocket();
+}
+
+void closeDSTCPSocket()
+{
+    freeaddrinfo(resTCP);
+    close(fdDSTCP);
 }

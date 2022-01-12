@@ -4,6 +4,7 @@
 #include <regex.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 int validRegex(char *buf, char *reg)
 {
@@ -108,4 +109,43 @@ int validGName(char *GName)
 int isMID(char *MID)
 {
     return validRegex(MID, "^[0-9]{4}$");
+}
+
+int sendTCP(int fd, char *message)
+{
+    int bytesSent = 0;
+    ssize_t nSent;
+    size_t messageLen = strlen(message);
+    while (bytesSent < messageLen)
+    { // Send initial message
+        nSent = write(fd, message + bytesSent, messageLen - bytesSent);
+        if (nSent == -1)
+        {
+            perror("[-] Failed to write on TCP");
+            return nSent;
+        }
+        bytesSent += nSent;
+    }
+    return bytesSent;
+}
+
+int readTCP(int fd, char *message, int maxSize)
+{
+    int bytesRead = 0;
+    ssize_t n;
+    while (bytesRead < maxSize)
+    {
+        n = read(fd, message + bytesRead, maxSize - bytesRead);
+        if (n == 0)
+        {
+            break; // Peer has performed an orderly shutdown -> POSSIBLE message complete
+        }
+        if (n == -1)
+        {
+            perror("[-] Failed to receive from server on TCP");
+            return n;
+        }
+        bytesRead += n;
+    }
+    return bytesRead;
 }

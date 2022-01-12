@@ -4,13 +4,16 @@
 #include "../centralizedmsg-api.h"
 #include "../centralizedmsg-api-constants.h"
 
+extern char addrDS[DS_ADDR_SIZE];
+extern char portDS[DS_PORT_SIZE];
+
 /**
  * @brief Creates socket that enables client-server communication via UDP protocol.
  *
  * @param addrDS string that contains the server's address.
  * @param portDS string that contains the server's port number.
  */
-void createDSUDPSocket(char *addrDS, char *portDS);
+void createDSUDPSocket();
 
 /**
  * @brief Exchanges messages between the client and the DS via UDP protocol.
@@ -96,9 +99,51 @@ void clientSubscribeGroup(char **tokenList, int numTokens);
 void clientUnsubscribeGroup(char **tokenList, int numTokens);
 
 /**
- * @brief Closes the socket created to exchange messages between the client and the DS.
+ * @brief Displays all the groups in the DS that the current logged in client is subscribed to.
+ *
+ * @param numTokens number of command arguments.
+ */
+void clientShowSubscribedGroups(int numTokens);
+
+/**
+ * @brief Locally selects a group to use ulist, post and retrieve on a DS group.
+ *
+ * @param tokenList list that contains all the command's arguments (including the command itself).
+ * @param numTokens number of command arguments.
+ */
+void clientSelectGroup(char **tokenList, int numTokens);
+
+/**
+ * @brief Locally displays the selected DS group's ID.
+ *
+ * @param numTokens
+ */
+void showCurrentSelectedGID(int numTokens);
+
+/**
+ * @brief Closes the socket created to exchange messages between the client and the DS via UDP protocol.
  *
  */
 void closeDSUDPSocket();
+
+/**
+ * @brief Estabelish a connection via TCP protocol between the client and the DS.
+ *
+ */
+void connectDSTCPSocket();
+
+/**
+ * @brief Shows all users that are subscribed to the current select DS group.
+ *
+ * @param tokenList list that contains all the command's arguments (including the command itself).
+ * @param numTokens number of command arguments.
+ */
+void showUsersSubscribedToGroup(char **tokenList, int numTokens);
+
+/**
+ * @brief Closes the socket created to exchange messages between the client and the DS via UDP protocol.
+ *
+ */
+void closeDSTCPSocket();
 
 #endif
