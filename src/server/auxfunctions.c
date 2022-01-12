@@ -52,7 +52,7 @@ int validMID(char *MID)
 
 int validFilename(char *fName)
 {
-    return validRegex(fName, "^[a-zA-Z0-9_-]{1,20}[.]{1}[a-z]{3}$");
+    return validRegex(fName, "^[a-zA-Z0-9_-]{1,20}[.]{1}[a-zA-Z]{3}$");
 }
 
 /**
