@@ -119,12 +119,6 @@ void clientSelectGroup(char **tokenList, int numTokens);
 void showCurrentSelectedGID(int numTokens);
 
 /**
- * @brief Closes the socket created to exchange messages between the client and the DS via UDP protocol.
- *
- */
-void closeDSUDPSocket();
-
-/**
  * @brief Estabelish a connection via TCP protocol between the client and the DS.
  *
  */
@@ -152,11 +146,5 @@ void clientPostInGroup(char *message);
  * @param numTokens number of command arguments.
  */
 void clientRetrieveFromGroup(char **tokenList, int numTokens);
-
-/**
- * @brief Closes the socket created to exchange messages between the client and the DS via UDP protocol.
- *
- */
-void closeDSTCPSocket();
 
 #endif

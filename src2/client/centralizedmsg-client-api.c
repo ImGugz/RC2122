@@ -32,17 +32,22 @@ char activeDSGID[DS_GID_SIZE];
 /* Message to DS via UDP protocol variable */
 char messageToDSUDP[CLIENT_TO_DS_UDP_SIZE];
 
+static void failDSUDP()
+{
+    closeUDPSocket(fdDSUDP, resUDP);
+    exit(EXIT_FAILURE);
+}
+
 static void errDSUDP()
 {
     fprintf(stderr, "[-] Wrong protocol message received from server via UDP. Program will now exit.\n");
-    closeDSUDPSocket();
-    exit(EXIT_FAILURE);
+    failDSUDP();
 }
 
 static void failDSTCP()
 {
-    closeDSUDPSocket();
-    closeDSTCPSocket();
+    closeUDPSocket(fdDSUDP, resUDP);
+    closeTCPSocket(fdDSTCP, resTCP);
     exit(EXIT_FAILURE);
 }
 
@@ -267,8 +272,7 @@ void exchangeDSUDPMsg(char *message)
     if (n == -1)
     { // Syscall failed -> terminate gracefully
         perror("[-] UDP message failed to send");
-        closeDSUDPSocket();
-        exit(EXIT_FAILURE);
+        failDSUDP();
     }
 
     // DS -> Client message
@@ -278,15 +282,13 @@ void exchangeDSUDPMsg(char *message)
     if (n == -1)
     {
         perror("[-] Failed to receive UDP message");
-        closeDSUDPSocket();
-        exit(EXIT_FAILURE);
+        failDSUDP();
     }
     dsReply[n] = '\0';
     if (dsReply[n - 1] != '\n')
     { // Each request/reply ends with newline according to DS-Client communication protocol
         fprintf(stderr, "[-] Wrong protocol message received from server via UDP. Program will now exit.\n");
-        closeDSUDPSocket();
-        exit(EXIT_FAILURE);
+        failDSUDP();
     }
     dsReply[n - 1] = '\0'; // Replace \n with \0
     processDSUDPReply(dsReply);
@@ -319,6 +321,14 @@ void clientUnregister(char **tokenList, int numTokens)
     { // Protocol validation
         fprintf(stderr, "[-] Invalid unregister command arguments. Please check given UID and/or password and try again.\n");
         return;
+    }
+
+    // If the client is logged in we have to locally log out
+    if (clientSession == LOGGED_IN && !strcmp(tokenList[1], activeClientUID))
+    {
+        memset(activeClientUID, 0, sizeof(activeClientUID));
+        memset(activeClientPWD, 0, sizeof(activeClientPWD));
+        clientSession = LOGGED_OUT;
     }
     sprintf(messageToDSUDP, "UNR %s %s\n", tokenList[1], tokenList[2]);
     exchangeDSUDPMsg(messageToDSUDP);
@@ -395,7 +405,7 @@ void clientExit(int numTokens)
         fprintf(stderr, "[-] Incorrect exit command usage. Please try again.\n");
         return;
     }
-    closeDSUDPSocket();
+    closeUDPSocket(fdDSUDP, resUDP);
     printf("[+] Exiting...\n");
     exit(EXIT_SUCCESS);
 }
@@ -461,6 +471,14 @@ void clientUnsubscribeGroup(char **tokenList, int numTokens)
         fprintf(stderr, "[-] Invalid given group ID to unsubscribe. Please try again.\n");
         return;
     }
+    // Warn client that they're trying to unsubscribe group that is selected
+    if (strlen(activeDSGID) > 0)
+    { // There's a group selected
+        if (!strcmp(activeDSGID, tokenList[1]))
+        {
+            printf("[!] The selected group is the one you're trying to unsubscribe.\n");
+        }
+    }
     sprintf(messageToDSUDP, "GUR %s %s\n", activeClientUID, tokenList[1]);
     exchangeDSUDPMsg(messageToDSUDP);
 }
@@ -519,20 +537,13 @@ void showCurrentSelectedGID(int numTokens)
     }
 }
 
-void closeDSUDPSocket()
-{
-    freeaddrinfo(resUDP);
-    close(fdDSUDP);
-}
-
 void connectDSTCPSocket()
 {
     fdDSTCP = socket(AF_INET, SOCK_STREAM, 0);
     if (fdDSTCP == -1)
     {
         perror("[-] Client TCP socket failed to create");
-        closeDSUDPSocket();
-        exit(EXIT_FAILURE);
+        failDSUDP();
     }
     memset(&hintsTCP, 0, sizeof(hintsTCP));
     hintsTCP.ai_family = AF_INET;
@@ -542,16 +553,13 @@ void connectDSTCPSocket()
     {
         perror("[-] Failed on TCP address translation");
         close(fdDSTCP);
-        closeDSUDPSocket();
-        exit(EXIT_FAILURE);
+        failDSUDP();
     }
     int n = connect(fdDSTCP, resTCP->ai_addr, resTCP->ai_addrlen);
     if (n == -1)
     {
         perror("[-] Failed to connect to TCP socket");
-        closeDSUDPSocket();
-        closeDSTCPSocket();
-        exit(EXIT_FAILURE);
+        failDSTCP();
     }
 }
 
@@ -581,9 +589,7 @@ void showClientsSubscribedToGroup(char **tokenList, int numTokens)
     sprintf(ulistClientMessage, "ULS %s\n", activeDSGID);
     if (sendTCP(fdDSTCP, ulistClientMessage) == -1)
     {
-        closeDSUDPSocket();
-        closeDSTCPSocket();
-        exit(EXIT_FAILURE);
+        failDSTCP();
     }
 
     // Read message from DS -> indefinitely read until nl has been read
@@ -592,7 +598,7 @@ void showClientsSubscribedToGroup(char **tokenList, int numTokens)
     if (tmp == NULL)
     {
         fprintf(stderr, "[-] Failed to allocate memory in calloc.\n");
-        closeDSTCPSocket();
+        closeTCPSocket(fdDSTCP, resTCP);
         return;
     }
     char *p_message = tmp;
@@ -607,7 +613,7 @@ void showClientsSubscribedToGroup(char **tokenList, int numTokens)
             {
                 free(p_message);
                 fprintf(stderr, "[-] Failed to allocate memory in calloc.\n");
-                closeDSTCPSocket();
+                closeTCPSocket(fdDSTCP, resTCP);
                 return;
             }
             // Set the new part to 0
@@ -669,7 +675,7 @@ void showClientsSubscribedToGroup(char **tokenList, int numTokens)
         errDSTCP();
     }
     free(p_message);
-    closeDSTCPSocket();
+    closeTCPSocket(fdDSTCP, resTCP);
 }
 
 void clientPostInGroup(char *command)
@@ -695,7 +701,7 @@ void clientPostInGroup(char *command)
         if (!validFName(Fname))
         { // Validate the file sent
             fprintf(stderr, "[-] The file you submit can't exceed 24 characters and must have a 3 letter file extension. Please try again.\n");
-            closeDSTCPSocket();
+            closeTCPSocket(fdDSTCP, resTCP);
             return;
         }
 
@@ -704,60 +710,46 @@ void clientPostInGroup(char *command)
         if (post == NULL)
         {
             perror("[-] Error opening given file");
-            closeDSTCPSocket();
+            closeTCPSocket(fdDSTCP, resTCP);
             return;
         }
         if (fseek(post, 0, SEEK_END) == -1)
         {
             perror("[-] Post file seek failed");
-            closeDSUDPSocket();
-            closeDSTCPSocket();
-            exit(EXIT_FAILURE); // Failed syscall
+            failDSTCP();
         }
         long lenFile = ftell(post); // long because it can have at most 10 digits and int goes to 2^31 - 1 which is 214--.7 (len 10) - it can be 999 999 999 9 bytes
         if (lenFile == -1)
         {
             perror("[-] Post file tell failed");
-            closeDSUDPSocket();
-            closeDSTCPSocket();
-            exit(EXIT_FAILURE); // Failed syscall
+            failDSTCP();
         }
         rewind(post);
+        if (fclose(post) == -1)
+        {
+            perror("[-] Post file failed to close");
+            failDSTCP();
+        }
 
         // Send initial message
         char postMessageWFile[CLIENTDS_POSTWFILE_SIZE];
         sprintf(postMessageWFile, "PST %s %s %ld %s %s %ld ", activeClientUID, activeDSGID, strlen(messageText), messageText, Fname, lenFile);
         if (sendTCP(fdDSTCP, postMessageWFile) == -1)
         {
-            closeDSUDPSocket();
-            closeDSTCPSocket();
-            exit(EXIT_FAILURE);
+            failDSTCP();
         }
 
         // Send file
-        if (sendFile(fdDSTCP, post, lenFile) == 0)
+        if (sendFile(fdDSTCP, Fname, lenFile) == 0)
         {
-            closeDSUDPSocket();
-            closeDSTCPSocket();
-            exit(EXIT_FAILURE);
-        }
-
-        // Close the file
-        if (fclose(post) == -1)
-        {
-            perror("[-] Post file closed failed");
-            closeDSUDPSocket();
-            closeDSTCPSocket();
-            exit(EXIT_FAILURE);
+            failDSTCP();
         }
 
         // Every reply/request must end with a \n
         char nl = '\n';
         if (sendTCP(fdDSTCP, &nl) == -1)
         {
-            closeDSUDPSocket();
-            closeDSTCPSocket();
-            exit(EXIT_FAILURE);
+            failDSTCP();
         }
     }
     else
@@ -766,9 +758,7 @@ void clientPostInGroup(char *command)
         sprintf(postMessageWOFile, "PST %s %s %ld %s\n", activeClientUID, activeDSGID, strlen(messageText), messageText);
         if (sendTCP(fdDSTCP, postMessageWOFile) == -1)
         {
-            closeDSUDPSocket();
-            closeDSTCPSocket();
-            exit(EXIT_FAILURE);
+            failDSTCP();
         }
     }
 
@@ -777,16 +767,12 @@ void clientPostInGroup(char *command)
     int n;
     if ((n = readTCP(fdDSTCP, postDSReply, DS_POSTREPLY_SIZE - 1)) == -1)
     {
-        closeDSUDPSocket();
-        closeDSTCPSocket();
-        exit(EXIT_FAILURE);
+        failDSTCP();
     }
     if (postDSReply[n - 1] != '\n')
     { // Each request/reply ends with newline according to DS-Client communication protocol
         fprintf(stderr, "[-] Wrong protocol message received from server via TCP. Program will now exit.\n");
-        closeDSUDPSocket();
-        closeDSTCPSocket();
-        exit(EXIT_FAILURE);
+        failDSTCP();
     }
     postDSReply[n - 1] = '\0';
 
@@ -809,7 +795,7 @@ void clientPostInGroup(char *command)
     {
         errDSTCP();
     }
-    closeDSTCPSocket();
+    closeTCPSocket(fdDSTCP, resTCP);
 }
 
 void clientRetrieveFromGroup(char **tokenList, int numTokens)
@@ -842,9 +828,7 @@ void clientRetrieveFromGroup(char **tokenList, int numTokens)
     sprintf(retrieveMessageToDS, "RTV %s %s %s\n", activeClientUID, activeDSGID, tokenList[1]);
     if (sendTCP(fdDSTCP, retrieveMessageToDS) == -1)
     {
-        closeDSUDPSocket();
-        closeDSTCPSocket();
-        exit(EXIT_FAILURE);
+        failDSTCP();
     }
 
     // Receive retrieve reply from the DS
@@ -855,9 +839,7 @@ void clientRetrieveFromGroup(char **tokenList, int numTokens)
     // Read the DS reply code
     if ((n = readTCP(fdDSTCP, codeDS, PROTOCOL_CODE_SIZE)) == -1)
     {
-        closeDSUDPSocket();
-        closeDSTCPSocket();
-        exit(EXIT_FAILURE);
+        failDSTCP();
     }
     codeDS[n - 1] = '\0'; // replace backspace with null terminator
     if (strcmp(codeDS, "RRT"))
@@ -868,18 +850,14 @@ void clientRetrieveFromGroup(char **tokenList, int numTokens)
     // Read the DS reply status
     if ((n = readTCP(fdDSTCP, statusDS, DSCLIENT_RTVSTATUS_SIZE)) == -1)
     {
-        closeDSUDPSocket();
-        closeDSTCPSocket();
-        exit(EXIT_FAILURE);
+        failDSTCP();
     }
     statusDS[n] = '\0';
     if (!strcmp(statusDS, "EOF") || !strcmp(statusDS, "NOK"))
     { // Every reply/request must end with a \n
         if ((n = readTCP(fdDSTCP, singleCharDS, CHAR_SIZE - 1)) == -1)
         {
-            closeDSUDPSocket();
-            closeDSTCPSocket();
-            exit(EXIT_FAILURE);
+            failDSTCP();
         }
         singleCharDS[n] = '\0';
         if (singleCharDS[n - 1] != '\n')
@@ -892,13 +870,13 @@ void clientRetrieveFromGroup(char **tokenList, int numTokens)
     if (!strcmp(statusDS, "EOF"))
     {
         printf("[+] There are no available messages to show in the selected group from the given starting message.\n");
-        closeDSTCPSocket();
+        closeTCPSocket(fdDSTCP, resTCP);
         return;
     }
     if (!strcmp(statusDS, "NOK"))
     {
         fprintf(stderr, "[-] Failed to retrieve from group. Please check if you have a selected subscribed group and try again.\n");
-        closeDSTCPSocket();
+        closeTCPSocket(fdDSTCP, resTCP);
         return;
     }
 
@@ -934,7 +912,7 @@ void clientRetrieveFromGroup(char **tokenList, int numTokens)
     }
     int flagRTV = MID_OK;
     char MID[DS_MID_SIZE] = "", UID[CLIENT_UID_SIZE], TsizeBuf[DS_MSGTEXTSZ_SIZE] = "", Text[PROTOCOL_TEXT_SIZE + 1] = "";
-    char FName[PROTOCOL_FNAME_SIZE] = "", FsizeBuf[DS_MSGFILESZ_SIZE] = "";
+    char FName[PROTOCOL_FNAME_SIZE] = "", FsizeBuf[PROTOCOL_FILESZ_SIZE] = "";
     int Tsize;
     long Fsize;
     int j;
@@ -1077,7 +1055,7 @@ void clientRetrieveFromGroup(char **tokenList, int numTokens)
             printf("(%s - ", FName);
 
             // Read file size
-            for (j = 0; j < DS_MSGFILESZ_SIZE; ++j)
+            for (j = 0; j < PROTOCOL_FILESZ_SIZE; ++j)
             {
                 if ((n = readTCP(fdDSTCP, singleCharDS, CHAR_SIZE - 1)) == -1)
                 {
@@ -1124,11 +1102,5 @@ void clientRetrieveFromGroup(char **tokenList, int numTokens)
     {
         failDSTCP();
     }
-    closeDSTCPSocket();
-}
-
-void closeDSTCPSocket()
-{
-    freeaddrinfo(resTCP);
-    close(fdDSTCP);
+    closeTCPSocket(fdDSTCP, resTCP);
 }

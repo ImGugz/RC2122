@@ -95,7 +95,7 @@ void processInput()
             tokenList[numTokens++] = token;
             token = strtok(NULL, " ");
         }
-        cmd = parseClientCommand(tokenList[0]);
+        cmd = parseClientDSCommand(tokenList[0]);
         switch (cmd)
         {
         case REGISTER:
@@ -142,6 +142,8 @@ void processInput()
             break;
         case RETRIEVE:
             clientRetrieveFromGroup(tokenList, numTokens);
+            break;
+        default:
             break;
         }
     }

@@ -38,7 +38,7 @@ int validPort(char *port)
     return validRegex(port, "^([0-9]{1,4}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$");
 }
 
-int parseClientCommand(char *command)
+int parseClientDSCommand(char *command)
 {
     if (!strcmp(command, "reg"))
         return REGISTER;
@@ -190,8 +190,13 @@ static int sendData(int fd, unsigned char *buffer, size_t num)
     return 1;
 }
 
-int sendFile(int fd, FILE *post, long lenFile)
+int sendFile(int fd, char *filePath, long lenFile)
 {
+    FILE *post = fopen(filePath, "rb");
+    if (post == NULL)
+    {
+        return 0;
+    }
     unsigned char buffer[FILEBUFFER_SIZE];
     do
     {
@@ -211,6 +216,10 @@ int sendFile(int fd, FILE *post, long lenFile)
         lenFile -= num;
         memset(buffer, 0, sizeof(buffer));
     } while (lenFile > 0);
+    if (fclose(post) == -1)
+    {
+        return 0;
+    }
     return 1;
 }
 
@@ -254,4 +263,52 @@ int recvFile(int fd, char *FName, long Fsize)
         return 0;
     }
     return 1;
+}
+
+void closeUDPSocket(int fdUDP, struct addrinfo *resUDP)
+{
+    freeaddrinfo(resUDP);
+    close(fdUDP);
+}
+
+void closeTCPSocket(int fdTCP, struct addrinfo *resTCP)
+{
+    freeaddrinfo(resTCP);
+    close(fdTCP);
+}
+
+int parseDSClientCommand(char *command)
+{
+    if (!strcmp(command, "REG"))
+        return REGISTER;
+    else if (!strcmp(command, "UNR"))
+        return UNREGISTER;
+    else if (!strcmp(command, "LOG"))
+        return LOGIN;
+    else if (!strcmp(command, "OUT"))
+        return LOGOUT;
+    else if (!strcmp(command, "GLS"))
+        return GROUPS;
+    else if (!strcmp(command, "GSR"))
+        return SUBSCRIBE;
+    else if (!strcmp(command, "GUR"))
+        return UNSUBSCRIBE;
+    else if (!strcmp(command, "GLM"))
+        return MY_GROUPS;
+    else if (!strcmp(command, "ULS"))
+        return ULIST;
+    else if (!strcmp(command, "PST"))
+        return POST;
+    else if (!strcmp(command, "RTV"))
+        return RETRIEVE;
+    else
+    { // No valid command was received
+        fprintf(stderr, "[-] Invalid user command code.\n");
+        return INVALID_COMMAND;
+    }
+}
+
+int isGID(char *GID)
+{
+    return validRegex(GID, "^[0-9]{2}");
 }

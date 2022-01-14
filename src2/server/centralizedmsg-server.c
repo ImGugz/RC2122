@@ -1,7 +1,10 @@
 #include "centralizedmsg-server-api.h"
+#include "ds-api/ds-udpandtcp.h"
 #include "../centralizedmsg-api.h"
 #include "../centralizedmsg-api-constants.h"
 #include <stdio.h>
+#include <errno.h>
+#include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -17,6 +20,23 @@ int main(int argc, char *argv[])
 {
     parseArgs(argc, argv);
     setupDSSockets();
+    fillDSGroupsInfo();
+    // Have 2 separate processes handling different operations
+    pid_t pid = fork();
+    if (pid == 0)
+    { // Set child process to handle UDP operations
+        handleDSTCP();
+    }
+    else if (pid > 0)
+    { // Set parent process to handle TCP operations
+        handleDSUDP();
+    }
+    else
+    {
+        perror("[-] Failed to fork");
+        exit(EXIT_FAILURE);
+    }
+    exit(EXIT_SUCCESS);
 }
 
 static void parseArgs(int argc, char *argv[])

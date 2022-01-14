@@ -3,6 +3,9 @@
 
 #include "centralizedmsg-api-constants.h"
 #include <stdio.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
 
 /**
  * @brief Checks if a given buffer specifies a given pattern.
@@ -35,12 +38,12 @@ int validPort(char *port);
  * @param command string containing the command.
  * @return respective MACRO assigned to given command.
  */
-int parseClientCommand(char *command);
+int parseClientDSCommand(char *command);
 
 /**
  * @brief Checks if a given user ID is valid according to the statement's rules.
  *
- * @param UID string that contains the used ID.
+ * @param UID string that contains the user ID.
  * @return 1 if it's valid, 0 otherwise.
  */
 int validUID(char *UID);
@@ -127,7 +130,7 @@ int validMID(char *MID);
  * @param lenFile number of bytes in file being sent.
  * @return 1 if file was sent, 0 otherwise.
  */
-int sendFile(int fd, FILE *post, long lenFile);
+int sendFile(int fd, char *filePath, long lenFile);
 
 /**
  * @brief Receives a file via TCP.
@@ -138,5 +141,33 @@ int sendFile(int fd, FILE *post, long lenFile);
  * @return 1 if file was received, 0 otherwise.
  */
 int recvFile(int fd, char *FName, long Fsize);
+
+/**
+ * @brief Closes the socket created to exchange messages between the client and the DS via UDP protocol.
+ *
+ */
+void closeUDPSocket(int fdUDP, struct addrinfo *resUDP);
+
+/**
+ * @brief Closes the socket created to exchange messages between the client and the DS via TCP protocol.
+ *
+ */
+void closeTCPSocket(int fdTCP, struct addrinfo *resTCP);
+
+/**
+ * @brief "Translates" a given protocol message code into a pre-defined macro.
+ *
+ * @param command string containing the protocol message code.
+ * @return respective MACRO assigned to given message code.
+ */
+int parseDSClientCommand(char *command);
+
+/**
+ * @brief Checks if a given group ID is valid according to the statement's rules.
+ *
+ * @param UID string that contains the group ID.
+ * @return 1 if it's valid, 0 otherwise.
+ */
+int isGID(char *GID);
 
 #endif

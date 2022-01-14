@@ -1,6 +1,15 @@
 #ifndef CENTRALIZEDMESSAGING_API_CONSTANTS_H
 #define CENTRALIZEDMESSAGING_API_CONSTANTS_H
 
+/* Preprocessed macro to determine min(x,y) */
+#define MIN(x, y) (((x) < (y)) ? (x) : (y))
+
+/* DS wrong protocol message */
+#define ERR_MSG "ERR\n"
+
+/* DS wrong protocol message bytes */
+#define ERR_MSG_SIZE 4
+
 /* By default DS server is set to be listening on localhost */
 #define DS_DEFAULT_ADDR "127.0.0.1"
 
@@ -38,7 +47,7 @@
 #define RETRIEVE 15
 
 /* The buffer size for a message from the client to the DS via UDP protocol */
-#define CLIENT_TO_DS_UDP_SIZE 295
+#define CLIENT_TO_DS_UDP_SIZE 40
 
 /* The buffer size for a message from the DS to the client via UDP protocol */
 #define DS_TO_CLIENT_UDP_SIZE 4096
@@ -80,6 +89,9 @@
 /* The buffer size for a protocol message status via UDP protocol */
 #define PROTOCOL_STATUS_TCP_SIZE 5
 
+/* The maximum size of a buffer containing the length of a text message */
+#define PROTOCOL_TEXTSZ_SIZE 4
+
 /* The maximum number of ASCII characters in a text message */
 #define PROTOCOL_TEXT_SIZE 241
 
@@ -118,10 +130,84 @@
 #define DS_MSGTEXTSZ_SIZE 4
 
 /* The size of a buffer that contains the number of bytes in a group message file */
-#define DS_MSGFILESZ_SIZE 11
+#define PROTOCOL_FILESZ_SIZE 11
 
 /* Macros for verbose on the DS */
 #define VERBOSE_OFF 0
 #define VERBOSE_ON 1
+
+/* Default size for the DS TCP listen queue */
+#define DS_LISTENQUEUE_SIZE 10
+
+/* Default DS hostname buffer size */
+#define DS_HOSTNAME_SIZE 1023
+
+/* Maximum number of existing groups in the DS */
+#define DS_MAX_NUM_GROUPS 100
+
+/* Macro used to read d_name attribute from struct dirent in all of DS operations */
+#define DIRENT_NAME_SIZE 256
+
+/* The size of a buffer containing a DS group's name file */
+#define DS_GNAMEPATH_SIZE 32
+
+/* The size of a buffer containing a registered DS client folder */
+#define DS_CLIENTDIRPATH_SIZE 19
+
+/* The size of a buffer containing a registered DS client password file */
+#define DS_CLIENTPWDPATH_SIZE 36
+
+/* The size of a buffer containing a user subscribed to group file path */
+#define DS_GROUPCLIENTSUBPATH_SIZE 27
+
+/* The size of a buffer containing a registered DS client login file */
+#define DS_CLIENTLOGINPATH_SIZE 37
+
+/* The size of a buffer containing a path to a DS group MSG folder */
+#define DS_GROUPMSGPATH_SIZE 21
+
+/* The size of a buffer containing all groups in the DS */
+#define DS_GROUPSLISTBUF_SIZE 3270
+
+/* The size of a buffer containing each group information */
+#define DS_GROUPINFOBUF_SIZE 34
+
+/* The size of a buffer containing a DS group's folder path */
+#define DS_GROUPDIRPATH_SIZE 17
+
+/* The size of a buffer containing a new DS groups status message */
+#define DS_NEWGROUPSTATUS_SIZE 7
+
+/* The size of a buffer containing a DS message to the client to send the command status */
+#define DS_TCPSTATUSBUF_SIZE 32
+
+/* The initial size for a dynamically allocated buffer that contains all users in a DS group */
+#define DS_ULISTBUFINIT_SIZE 302 // 50 users
+
+/* The size of a buffer containing a group message directory path */
+#define DS_GROUPMSGDIRPATH_SIZE 27
+
+/* The size of a buffer containing the path to a message's author file */
+#define DS_GROUPMSGAUTHORPATH_SIZE 43
+
+/* The size of a buffer containing the path to a message's text file */
+#define DS_GROUPMSGTEXTPATH_SIZE 39
+
+/* The size of a buffer containing the path to a message file */
+#define DS_GROUPMSGFILEPATH_SIZE 53
+
+/* The size of a buffer containing the initial retrieve status message */
+#define DS_RETINITSTATUS_SIZE 6
+
+/* Macros for file in message directory flag */
+#define NO_FILE 0
+#define HAS_FILE 1
+
+/* The size of bufferS that contain fragments of message information to be retrieved from the DS to the client */
+#define DS_MSGTEXTINFO_SIZE 257
+#define DS_MSGFILEINFO_SIZE 41
+
+/* The size of a buffer to receive confirmation from the DS to the client */
+#define DS_RETCONFBUF_SIZE 256
 
 #endif

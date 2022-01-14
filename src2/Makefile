@@ -9,20 +9,18 @@ CLIENT_EXEC = user
 SERVER_EXEC = DS
 
 # Object directory's name
-ODIR=obj
+ODIR = obj
 
-# List of dependencies
-DEPS = centralizedmsg-api.h centralizedmsg-api-constants.h client/centralizedmsg-client-api.h server/centralizedmsg-server-api.h 
-
-# List of objects
-#_OBJ = centralizedmsg-api.o centralizedmsg-client.o centralizedmsg-client-api.o centralizedmsg-server.o centralizedmsg-server-api.o
-#OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
-
-COMMON_OBJECTS = centralizedmsg-api.o
+# Common dependencies
+DEPS = centralizedmsg-api.h centralizedmsg-api-constants.h
+# Add client dependencies
+DEPS += client/centralizedmsg-client-api.h
+# Add server dependencies
+DEPS += server/centralizedmsg-server-api.h server/ds-api/ds-operations.h server/ds-api/ds-udpandtcp.h
 
 _OBJ1 += centralizedmsg-api.o centralizedmsg-client.o centralizedmsg-client-api.o 
 OBJ1 = $(patsubst %,$(ODIR)/%,$(_OBJ1))
-_OBJ2 += centralizedmsg-api.o centralizedmsg-server.o centralizedmsg-server-api.o
+_OBJ2 += centralizedmsg-api.o centralizedmsg-server.o centralizedmsg-server-api.o ds-operations.o ds-udpandtcp.o
 OBJ2 = $(patsubst %,$(ODIR)/%,$(_OBJ2))
 
 
@@ -39,7 +37,7 @@ $(CLIENT_EXEC): $(OBJ1)
 
 # Compile server
 $(SERVER_EXEC): $(OBJ2)
-	$(CC) $(CFLAGS) -o $@ $^
+	@$(CC) $(CFLAGS) -o $@ $^
 	$(info Server compiled successfully!)
 	$(info To run server -> ./$(SERVER_EXEC) [-p DSport] [-v])
 
@@ -56,7 +54,12 @@ $(ODIR)/%.o: client/%.c $(DEPS)
 # Create .o for all .c inside the server directory
 $(ODIR)/%.o: server/%.c $(DEPS)
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS) -c -o $@ $< 
+	@$(CC) $(CFLAGS) -c -o $@ $< 
+
+# Create .o for all .c inside ds-api directory
+$(ODIR)/%.o: server/ds-api/%.c $(DEPS)
+	@mkdir -p $(@D)
+	@$(CC) $(CFLAGS) -c -o $@ $< 
 
 # Delete the objects' directory and both executables
 clean:
