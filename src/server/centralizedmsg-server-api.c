@@ -458,7 +458,7 @@ char *clientSubscribeGroup(char **tokenList, int numTokens)
         int n = dsGroups.no_groups;
         strcpy(dsGroups.groupinfo[n].name, tokenList[3]);
         strcpy(dsGroups.groupinfo[n].no, newDSGID);
-        dsGroups.no_groups++;
+        (&dsGroups)->no_groups++;
 
         // Create new group status message
         char newGroupStatus[DS_NEWGROUPSTATUS_SIZE];
@@ -608,8 +608,9 @@ void showClientsInGroup(int fd)
     }
 
     // Check if group exists
-    int numGID = atoi(GID);
-    if (numGID > dsGroups.no_groups)
+    char dsGroupPath[DS_GROUPDIRPATH_SIZE];
+    sprintf(dsGroupPath, "server/GROUPS/%s", GID);
+    if (!directoryExists(dsGroupPath))
     {
         sendDSStatusTCP(fd, ULIST, "NOK");
         return;
@@ -677,6 +678,7 @@ void clientPostInGroup(int fd)
     if (!userSubscribedToGroup(UID, GID))
     {
         sendDSStatusTCP(fd, POST, "NOK");
+        return;
     }
 
     // Read message TSize and check if it's a valid text size
