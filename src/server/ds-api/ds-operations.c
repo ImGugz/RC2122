@@ -811,6 +811,5 @@ int retrieveDSGroupMessages(int fd, const char *GID, int startMID, int numMsgsTo
         return 0;
     }
     clientRetrieveConfirmation[b] = '\0';
-    printf("Client sent for confirmation: %s", clientRetrieveConfirmation);
     return 1;
 }
