@@ -64,5 +64,5 @@ $(ODIR)/%.o: server/ds-api/%.c $(DEPS)
 # Delete the objects' directory and both executables
 clean:
 	@rm -rf $(ODIR)
-	@rm -f *~ core $(INCDIR)/*~ $(CLIENT_EXEC)
+	@rm -f *~ core $(INCDIR)/*~ $(CLIENT_EXEC) $(SERVER_EXEC)
 	$(info Cleaned successfully!)
