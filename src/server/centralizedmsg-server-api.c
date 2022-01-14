@@ -674,13 +674,6 @@ void clientPostInGroup(int fd)
         exit(EXIT_FAILURE);
     }
 
-    // Check if user is subscribed to group
-    if (!userSubscribedToGroup(UID, GID))
-    {
-        sendDSStatusTCP(fd, POST, "NOK");
-        return;
-    }
-
     // Read message TSize and check if it's a valid text size
     char TSizeBuf[PROTOCOL_TEXTSZ_SIZE] = "";
     for (i = 0; i < PROTOCOL_TEXTSZ_SIZE; ++i)
@@ -730,7 +723,21 @@ void clientPostInGroup(int fd)
     }
     if (singleCharDS[0] == '\n')
     { // Only text was sent
-        sendDSStatusTCP(fd, POST, newMID);
+        if (!userSubscribedToGroup(UID, GID))
+        { // In order to prevent connection reset by peer and not getting the full message from the client
+          // we only check if the client is subscribed to the given group after receiving the whole message from it
+            sendDSStatusTCP(fd, POST, "NOK");
+            char newGroupMsgDSPath[DS_GROUPMSGDIRPATH_SIZE];
+            sprintf(newGroupMsgDSPath, "server/GROUPS/%s/MSG/%s", GID, newMID);
+            if (!removeDirectory(newGroupMsgDSPath))
+            {
+                exit(EXIT_FAILURE);
+            }
+        }
+        else
+        {
+            sendDSStatusTCP(fd, POST, newMID);
+        }
         return;
     }
     else if (singleCharDS[0] == ' ')
@@ -810,7 +817,21 @@ void clientPostInGroup(int fd)
             exit(EXIT_FAILURE); // No verification cause it'll exit with failure either way
         }
 
-        sendDSStatusTCP(fd, POST, newMID);
+        if (!userSubscribedToGroup(UID, GID))
+        { // In order to prevent connection reset by peer and not getting the full message from the client
+          // we only check if the client is subscribed to the given group after receiving the whole message from it
+            sendDSStatusTCP(fd, POST, "NOK");
+            char newGroupMsgDSPath[DS_GROUPMSGDIRPATH_SIZE];
+            sprintf(newGroupMsgDSPath, "server/GROUPS/%s/MSG/%s", GID, newMID);
+            if (!removeDirectory(newGroupMsgDSPath))
+            {
+                exit(EXIT_FAILURE);
+            }
+        }
+        else
+        {
+            sendDSStatusTCP(fd, POST, newMID);
+        }
     }
     else
     { // Wrong protocol message - Tejo aborts

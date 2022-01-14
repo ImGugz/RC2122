@@ -6,6 +6,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/time.h>
+#include <errno.h>
 
 #define MIN(x, y) (((x) < (y)) ? (x) : (y)) // Macro to determine min(x, y)
 
@@ -136,17 +137,39 @@ int readTCP(int fd, char *message, int maxSize)
 {
     int bytesRead = 0;
     ssize_t n;
+
     while (bytesRead < maxSize)
     {
+        if (timerOn(fd) == -1)
+        {
+            perror("[-] Failed to start TCP timer");
+            return -1;
+        }
         n = read(fd, message + bytesRead, maxSize - bytesRead);
+
+        // As soon as we read the first byte, turn off timer
+        if (timerOff(fd) == -1)
+        {
+            perror("[-] Failed to turn off TCP timer");
+            return -1;
+        }
+
         if (n == 0)
         {
             break; // Peer has performed an orderly shutdown -> POSSIBLE message complete
         }
         if (n == -1)
         {
-            perror("[-] Failed to receive from server on TCP");
-            return n;
+            if (errno == EAGAIN || errno == EWOULDBLOCK)
+            {
+                perror("[-] TCP socket timed out while reading. Program will now exit.\n");
+                return 0;
+            }
+            else
+            {
+                perror("[-] Failed to receive from server on TCP");
+                return n;
+            }
         }
         bytesRead += n;
     }
@@ -155,7 +178,7 @@ int readTCP(int fd, char *message, int maxSize)
 
 int validFName(char *FName)
 {
-    return validRegex(FName, "^[a-zA-Z0-9_-]{1,20}[.]{1}[a-zA-Z]{3}$");
+    return validRegex(FName, "^[a-zA-Z0-9_-]{1,20}[.]{1}[a-zA-Z0-9]{3}$");
 }
 
 int validMID(char *MID)
@@ -231,21 +254,44 @@ int recvFile(int fd, char *FName, long Fsize)
     unsigned char bufFile[FILEBUFFER_SIZE] = "";
     ssize_t n;
     FILE *file = fopen(FName, "wb");
+
     if (!file)
     {
         perror("Failed to create file");
         return 0;
     }
+
     do
     {
-        toRead = MIN(sizeof(bufFile), Fsize - bytesRecv);
-        n = read(fd, bufFile, toRead);
-        if (n == -1)
+        if (timerOn(fd) == -1)
         {
-            perror("[-] Failed to read from TCP");
-            fclose(file);
+            perror("[-] Failed to start TCP timer");
             return 0;
         }
+        toRead = MIN(sizeof(bufFile), Fsize - bytesRecv);
+        n = read(fd, bufFile, toRead);
+
+        if (n == -1)
+        {
+            if (errno == EAGAIN || errno == EWOULDBLOCK)
+            {
+                perror("[-] TCP socket timed out while reading. Program will now exit.\n");
+                return 0;
+            }
+            else
+            {
+                perror("[-] Failed to read from TCP");
+                fclose(file);
+                return 0;
+            }
+        }
+
+        if (timerOff(fd) == -1)
+        {
+            perror("[-] Failed to turn off TCP timer");
+            return 0;
+        }
+
         if (n > 0)
         {
             bytesRecv += n;
