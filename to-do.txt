@@ -1,6 +1,0 @@
-- Testar server response com merdas erradas vindas do cliente (I'm on it)
-- Implementar timeout nos sockets
-- post()
-- retrieve()
-- Usar script dos professores para saber se mensagens deles terminam mesmo com \n ou \0 e em que índices
-- Verificar tamanhos das macros se funcionam no Linux do pc do lab
