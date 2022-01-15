@@ -9,7 +9,7 @@
 - ist195587 - Gustavo Aguiar
 
 ## Usage
-./user [-n DSIP] [-p DSport]
+./user [-n DSIP] [-p DSport]\
 ./DS [-p DSport] [-v]
 
 ## Commands
