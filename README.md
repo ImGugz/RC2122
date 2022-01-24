@@ -3,7 +3,7 @@
 ## Context
 1 project assigned from RC (Computer Networks) in the first trimester of 2021/2022 (IST).
 
-## Group 26
+## Group 18
 - ist195535 - António Coelho
 - ist195536 - António Sebastião Assunção
 - ist195587 - Gustavo Aguiar
