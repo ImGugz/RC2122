@@ -43,7 +43,7 @@ static void parseArgs(int argc, char *argv[])
 {
     if (!(argc == 1 || argc == 2 || argc == 3 || argc == 4))
     {
-        fprintf(stderr, "[-] Invalid client program arguments. Usage: ./DS [-p DSport] [-v]\n");
+        fprintf(stderr, "[-] Invalid server program arguments. Usage: ./DS [-p DSport] [-v]\n");
         exit(EXIT_FAILURE);
     }
     for (int i = 1; i <= argc - 1; ++i)
