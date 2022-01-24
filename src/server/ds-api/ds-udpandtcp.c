@@ -6,6 +6,8 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <signal.h>
+#include <errno.h>
 
 /* DS Server information variables */
 char portDS[DS_PORT_SIZE] = DS_DEFAULT_PORT;
@@ -86,17 +88,42 @@ void setupDSSockets()
     }
 
     // If verbose is on print out where the DS server is running and at which port it's listening to
-    if (verbose == VERBOSE_ON)
+    char hostname[DS_HOSTNAME_SIZE + 1];
+    if (gethostname(hostname, DS_HOSTNAME_SIZE) == -1)
     {
-        char hostname[DS_HOSTNAME_SIZE + 1];
-        if (gethostname(hostname, DS_HOSTNAME_SIZE) == -1)
+        fprintf(stderr, "[-] Failed to get DS hostname.\n");
+        closeUDPSocket(fdDSUDP, resUDP);
+        closeTCPSocket(listenTCPDS, resTCP);
+        exit(EXIT_FAILURE);
+    }
+    printf("[+] DS server started @ %s.\n[!] Currently listening in port %s for UDP and TCP connections...\n\n", hostname, portDS);
+
+    // Stop zombie processes
+    struct sigaction actDS;
+    if (sigaction(SIGCHLD, &actDS, NULL) == -1)
+    {
+        perror("[-] Failed to avoid child zombies");
+        closeUDPSocket(fdDSUDP, resUDP);
+        closeTCPSocket(listenTCPDS, resTCP);
+        exit(EXIT_FAILURE);
+    }
+
+    if (verbose == VERBOSE_OFF)
+    { // Close stderr and stdout if verbose is off
+        if (fclose(stdout) == -1)
         {
-            fprintf(stderr, "[-] Failed to get DS hostname.\n");
+            perror("[-] Failed to prepare TCP socket to accept connections");
             closeUDPSocket(fdDSUDP, resUDP);
             closeTCPSocket(listenTCPDS, resTCP);
             exit(EXIT_FAILURE);
         }
-        printf("[+] DS server started @ %s.\n[!] Currently listening in port %s for UDP and TCP connections...\n\n", hostname, portDS);
+        if (fclose(stderr) == -1)
+        {
+            perror("[-] Failed to prepare TCP socket to accept connections");
+            closeUDPSocket(fdDSUDP, resUDP);
+            closeTCPSocket(listenTCPDS, resTCP);
+            exit(EXIT_FAILURE);
+        }
     }
 }
 
@@ -133,10 +160,10 @@ void handleDSUDP()
             }
         }
         clientBuf[n - 1] = '\0';
-        if (verbose == VERBOSE_ON)
-        {
-            logVerbose(clientBuf, cliaddr);
-        }
+        char commandCode[PROTOCOL_CODE_SIZE];
+        strncpy(commandCode, clientBuf, PROTOCOL_CODE_SIZE - 1);
+        commandCode[PROTOCOL_CODE_SIZE - 1] = '\0';
+        printf("[!] Client @ %s:%d sent %s command.\n", inet_ntoa(cliaddr.sin_addr), ntohs(cliaddr.sin_port), commandCode);
         serverBuf = processClientUDP(clientBuf);
         n = sendto(fdDSUDP, serverBuf, strlen(serverBuf), 0, (struct sockaddr *)&cliaddr, addrlen);
         if (n == -1)
@@ -156,6 +183,7 @@ void handleDSTCP()
     socklen_t addrlen;
     int newDSFDTCP;
     pid_t pid;
+    int ret;
     while (1)
     {
         addrlen = sizeof(cliaddr);
@@ -169,7 +197,7 @@ void handleDSTCP()
             char commandCode[PROTOCOL_CODE_SIZE];
             int n = readTCP(newDSFDTCP, commandCode, PROTOCOL_CODE_SIZE);
             if (n == -1)
-            { // TODO: CHECK TIMEOUT
+            {
                 close(newDSFDTCP);
                 exit(EXIT_FAILURE);
             }
@@ -180,11 +208,20 @@ void handleDSTCP()
                 exit(EXIT_FAILURE);
             }
             commandCode[PROTOCOL_CODE_SIZE - 1] = '\0'; // Remove backspace
-            // TODO: ADD VERBOSE
+            printf("[!] Client @ %s:%d sent %s command.\n", inet_ntoa(cliaddr.sin_addr), ntohs(cliaddr.sin_port), commandCode);
             processClientTCP(newDSFDTCP, commandCode);
             close(newDSFDTCP);
             exit(EXIT_SUCCESS);
         }
-        close(newDSFDTCP);
+        do
+        {
+            ret = close(newDSFDTCP);
+        } while (ret == -1 && errno == EINTR);
+        if (ret == -1)
+        {
+            fprintf(stderr, "[-] Failed to properly close new descriptor upon possible child process death");
+            closeTCPSocket(listenTCPDS, resTCP);
+            exit(EXIT_FAILURE);
+        }
     }
 }
