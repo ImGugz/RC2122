@@ -87,17 +87,6 @@ void setupDSSockets()
         exit(EXIT_FAILURE);
     }
 
-    // If verbose is on print out where the DS server is running and at which port it's listening to
-    char hostname[DS_HOSTNAME_SIZE + 1];
-    if (gethostname(hostname, DS_HOSTNAME_SIZE) == -1)
-    {
-        fprintf(stderr, "[-] Failed to get DS hostname.\n");
-        closeUDPSocket(fdDSUDP, resUDP);
-        closeTCPSocket(listenTCPDS, resTCP);
-        exit(EXIT_FAILURE);
-    }
-    printf("[+] DS server started @ %s.\n[!] Currently listening in port %s for UDP and TCP connections...\n\n", hostname, portDS);
-
     // Stop zombie processes
     struct sigaction actDS;
     if (sigaction(SIGCHLD, &actDS, NULL) == -1)
@@ -125,6 +114,17 @@ void setupDSSockets()
             exit(EXIT_FAILURE);
         }
     }
+
+    // If verbose is on print out where the DS server is running and at which port it's listening to
+    char hostname[DS_HOSTNAME_SIZE + 1];
+    if (gethostname(hostname, DS_HOSTNAME_SIZE) == -1)
+    {
+        fprintf(stderr, "[-] Failed to get DS hostname.\n");
+        closeUDPSocket(fdDSUDP, resUDP);
+        closeTCPSocket(listenTCPDS, resTCP);
+        exit(EXIT_FAILURE);
+    }
+    printf("[+] DS server started @ %s.\n[!] Currently listening in port %s for UDP and TCP connections...\n\n", hostname, portDS);
 }
 
 void logVerbose(char *clientBuf, struct sockaddr_in s)
