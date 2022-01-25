@@ -8,8 +8,6 @@
 #include <sys/time.h>
 #include <errno.h>
 
-#define MIN(x, y) (((x) < (y)) ? (x) : (y)) // Macro to determine min(x, y)
-
 int validRegex(char *buf, char *reg)
 {
     int reti;
