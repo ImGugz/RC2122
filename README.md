@@ -1,7 +1,7 @@
 # RC2122
 
 ## Context
-1 project assigned from RC (Computer Networks) in the first trimester of 2021/2022 (IST).
+1 project assigned from RC (Computer Networks) in the second trimester of 2021/2022 (IST).
 
 ## Group 18
 - ist195535 - António Coelho
